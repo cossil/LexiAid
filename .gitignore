@@ -7,3 +7,7 @@
 *.db-shm
 *.db-wal
 "
+
+# Environment variables with secret credentials
+backend/.env
+.env
