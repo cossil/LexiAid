@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tutor Agent Tester</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input[type=\"text\"], textarea { width: calc(100% - 22px); padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { min-height: 80px; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; }
+        button:hover { background-color: #0056b3; }
+        #authStatus, #responseArea, #errorArea { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        #authStatus { background-color: #e7f3ff; border: 1px solid #b3d7ff; }
+        #responseArea { background-color: #e6ffed; border: 1px solid #b3f0c8; white-space: pre-wrap; word-wrap: break-word; }
+        #errorArea { background-color: #ffebe6; border: 1px solid #ffc2b3; color: #d9534f; white-space: pre-wrap; word-wrap: break-word; }
+        .hidden { display: none; }
+    </style>
+    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <!-- Add Firebase products that you want to use -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Tutor Agent Tester</h1>
+
+        <div id="authSection">
+            <h2>Firebase Authentication</h2>
+            <div id="authStatus">Not signed in.</div>
+            <button id="signInButton">Sign In with Google</button>
+            <button id="signOutButton" class="hidden">Sign Out</button>
+        </div>
+
+        <div id="agentInteractionSection" class="hidden">
+            <h2>Agent Interaction</h2>
+            <form id="agentForm">
+                <div>
+                    <label for="query">Query:</label>
+                    <textarea id="query" name="query" required></textarea>
+                </div>
+                <div>
+                    <label for="documentId">Document ID (Optional):</label>
+                    <input type="text" id="documentId" name="documentId">
+                </div>
+                <button type="submit">Send to Agent</button>
+            </form>
+        </div>
+
+        <h2>Agent Response</h2>
+        <div id="responseArea">No response yet.</div>
+        
+        <h2>Error Log</h2>
+        <div id="errorArea">No errors yet.</div>
+    </div>
+
+    <script>
+        // Firebase configuration updated with provided credentials
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLVREytbAcmjQpPBeUYv5SVSDsCrr3Vss",
+            authDomain: "ai-tutor-dev-457802.firebaseapp.com",
+            projectId: "ai-tutor-dev-457802",
+            storageBucket: "ai-tutor-dev-457802.firebasestorage.app",
+            messagingSenderId: "459030890739",
+            appId: "1:459030890739:web:38c19c0f0534f619614f86",
+            // measurementId: "YOUR_MEASUREMENT_ID" // Optional, not provided, so commented out or omitted
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        const signInButton = document.getElementById('signInButton');
+        const signOutButton = document.getElementById('signOutButton');
+        const authStatusDiv = document.getElementById('authStatus');
+        const agentInteractionSection = document.getElementById('agentInteractionSection');
+        const agentForm = document.getElementById('agentForm');
+        const responseArea = document.getElementById('responseArea');
+        const errorArea = document.getElementById('errorArea');
+        
+        let currentIdToken = null;
+
+        // Firebase Auth state listener
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                authStatusDiv.textContent = `Signed in as: ${user.email}`;
+                signInButton.classList.add('hidden');
+                signOutButton.classList.remove('hidden');
+                agentInteractionSection.classList.remove('hidden');
+                user.getIdToken().then(token => {
+                    currentIdToken = token;
+                    console.log("Firebase ID Token obtained.");
+                }).catch(error => {
+                    console.error("Error getting ID token:", error);
+                    currentIdToken = null;
+                    errorArea.textContent = `Error getting ID token: ${error.message}`;
+                });
+            } else {
+                authStatusDiv.textContent = 'Not signed in.';
+                signInButton.classList.remove('hidden');
+                signOutButton.classList.add('hidden');
+                agentInteractionSection.classList.add('hidden');
+                currentIdToken = null;
+                console.log("User signed out.");
+            }
+        });
+
+        // Sign in
+        signInButton.addEventListener('click', () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => {
+                console.error("Sign-in error:", error);
+                errorArea.textContent = `Sign-in error: ${error.message}`;
+            });
+        });
+
+        // Sign out
+        signOutButton.addEventListener('click', () => {
+            auth.signOut().catch(error => {
+                console.error("Sign-out error:", error);
+                errorArea.textContent = `Sign-out error: ${error.message}`;
+            });
+        });
+
+        // Handle agent form submission
+        agentForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            responseArea.textContent = 'Waiting for response...';
+            errorArea.textContent = 'No errors yet.';
+
+            if (!currentIdToken) {
+                errorArea.textContent = 'Not signed in or ID token not available. Please sign in again.';
+                responseArea.textContent = '';
+                return;
+            }
+
+            const query = document.getElementById('query').value;
+            const documentId = document.getElementById('documentId').value;
+            const payload = { query };
+            if (documentId) {
+                payload.document_id = documentId;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8081/api/v2/agent/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentIdToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    responseArea.textContent = JSON.stringify(responseData, null, 2);
+                    // If you expect responseData.agent_response directly:
+                    // responseArea.textContent = responseData.agent_response || JSON.stringify(responseData, null, 2);
+                } else {
+                    errorArea.textContent = `Error ${response.status}: ${JSON.stringify(responseData, null, 2)}`;
+                    responseArea.textContent = 'Request failed.';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                errorArea.textContent = `Network or fetch error: ${error.message}`;
+                responseArea.textContent = 'Request failed.';
+            }
+        });
+    </script>
+</body>
+</html>

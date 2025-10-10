@@ -1,0 +1,46 @@
+[
+{
+    "decision_point": "Initial Document Understanding Agent (DUA) Performance",
+    "decision": "Abandon the complex, multi-step DUA v1 in favor of the DUA v2 architecture, which uses a single, comprehensive prompt to a multimodal LLM.",
+    "rationale": "Testing showed the DUA v2 approach was significantly faster and produced higher-quality, TTS-ready output that better served the project's auditory-first mission.",
+    "alternatives_considered": "Continuing to optimize the slow and less effective DUA v1."
+  },
+  {
+    "decision_point": "Handling repeated, destructive code changes by the AI Code Agent (ACA).",
+    "decision": "Adopt the mandatory 'Analyze-Document-Plan-Implement' (ADPI) workflow for all future development.",
+    "rationale": "Directly tasking ACA with implementation was proven to be high-risk, frequently leading to regressions that broke stable features. The ADPI workflow imposes a necessary safety layer of analysis and planning before any code is modified.",
+    "alternatives_considered": "Providing more context in each prompt to ACA (deemed insufficient to overcome its core memory limitation)."
+  },
+  {
+    "decision_point": "Addressing the recurring failures in the interactive Quiz feature.",
+    "decision": "Halt all direct implementation attempts on the Quiz feature and adopt a Test-Driven Development approach, starting with a 'safety net' of tests for stable features. Subsequently, replace the entire feature with a new 'Quiz Engine V2' architecture.",
+    "rationale": "The Quiz feature's logic was too fragile to be fixed directly. A full replacement based on the successful DUA v2 pattern was determined to be a more robust, long-term solution. The TDD approach ensured the stability of the application during this major refactoring.",
+    "alternatives_considered": "Continuing to try and patch the old quiz logic directly (rejected as high-risk and repeatedly unsuccessful)."
+  },
+  {
+    "decision_point": "Fixing UI navigation bugs from Quiz Mode.",
+    "decision": "Refactor the ChatPage.tsx component to use a single, shared source of truth for quiz state (the QuizContext) instead of its own local state.",
+    "rationale": "Analysis of working vs. non-working navigation paths revealed that the component was not reacting to global state changes. Using a shared context ensures the UI correctly reflects the application's true state, resolving the bug in a clean, architectural manner.",
+    "alternatives_considered": "Attempting to pass props or use other state synchronization methods, which would be more complex and less robust than using a shared context."
+  }
+  {
+    "decision": "Adopt Test-Driven Development (TDD)",
+    "rationale": "To improve code quality, reduce regressions caused by AI modifications, and provide a safety net for future development. Ensures that core functionality remains stable as new features are added.",
+    "alternatives_considered": "Continuing with manual testing only, which was deemed too slow and unreliable given the nature of AI-driven development."
+  },
+  {
+    "decision": "Overhaul the quiz feature with Quiz Engine v2",
+    "rationale": "The original quiz graph was overly complex, stateful, and difficult to debug. The v2 engine simplifies the logic into a single, robust LLM call, making it more reliable, predictable, and easier to maintain.",
+    "alternatives_considered": "Attempting to patch the existing v1 graph, which was rejected as it would not address the fundamental architectural flaws."
+  },
+  {
+    "decision": "Centralize quiz state management with a dedicated QuizContext",
+    "rationale": "A critical navigation bug was caused by decentralized state management. Creating a global `QuizContext` provides a single source of truth, eliminates state synchronization issues, and allows components like `DashboardLayout` and `ChatPage` to react consistently to state changes.",
+    "alternatives_considered": "Using prop drilling to pass state, which was rejected as it would make the component hierarchy more complex and brittle."
+  },
+  {
+    "decision": "Deprecate and remove unused backend code",
+    "rationale": "A thorough dependency analysis revealed a significant amount of dead or unused code in the backend. Removing it simplifies the codebase, reduces cognitive load for developers, and makes the system easier to reason about.",
+    "alternatives_considered": "Leaving the code in place, which would have contributed to technical debt."
+  }
+]

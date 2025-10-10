@@ -1,0 +1,45 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    networks:
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_public"
+      - "traefik.http.routers.lexiaid-api.rule=Host(`lexiaid.hankell.com.br`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.lexiaid-api.entrypoints=websecure"
+      - "traefik.http.routers.lexiaid-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.lexiaid-api.service=lexiaid-api-svc"
+      - "traefik.http.services.lexiaid-api-svc.loadbalancer.server.port=5000"
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.lexiaid-api.middlewares=api-stripprefix"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: always
+    networks:
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_public"
+      - "traefik.http.routers.lexiaid-app.rule=Host(`lexiaid.hankell.com.br`)"
+      - "traefik.http.routers.lexiaid-app.entrypoints=websecure"
+      - "traefik.http.routers.lexiaid-app.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.lexiaid-app.service=lexiaid-app-svc"
+      - "traefik.http.services.lexiaid-app-svc.loadbalancer.server.port=80"
+
+networks:
+  traefik_public:
+    external: true
+    name: hankellnet
+
+
+    echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDjtLvT2BZa45QAXr9JXHrpDz8Jygs69Q1RcZrRhUA+8UXX53w1yHB2MXTMZgvdfnr+1qBOW23p4mhNjQXSzqWza3GYe2iDSfXpc/dZ2BTi50YDd051rM53QnP4NC3SVs6fHxMCe+QiV3yO1CEh5TThgSB/t4MtIoyOg1ZA78gw+dh6A2xBcpvMmO4BKVAKPhYKC2BUd2xTVGO7J2bhT7sOyDXO8rF6VUI4VIE5ClewrKEKUbNmJ3AIrBLTEy6fvtvHo+c2ru/QAqlrkTviLp/wM7VyFPaeslEQtGMekAw4Z4+mIiGGfvjGo7a57WquHcydJUjkcnCe8wiJBsVzIbZq2LdAcVXWuCyuezM0Q4mNi6d3A/qomSn3tGnVQmg1xR79AGSQf++UfzV4E5iuuivUGP37IIJVMzYiGxShAfsuVtBVPRGdZviOzyoqiwWpxvOLC6mC0I2KkLGeLA2hmIDP3LOMoEyQdiuHOCAVtefa+oEiNvNqwEJ7W5UL0KKjkjfJISFBoM4LfCDud5HauCd3FkhZ3+qM64W0h1rKuC8LmJJtY/t5QYrLVswU/HKv48RKLdXnrsIvGSpxAzzIjlCq+Z+exqDoyyGce5QaRIz73eFIE0bZ9l6Nd0cnELlr+8zxYCn7/Qabw0eYnQ8kjmIYoR8MCOJv1JrzPOGm/K5diw== cossi@LENOVO_Alex" >> ~/.ssh/authorized_keys

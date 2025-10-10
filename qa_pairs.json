@@ -1,0 +1,22 @@
+[
+  {
+    "question": "What is the primary goal of the LexiAid project?",
+    "answer": "To develop an accessible, AI-powered learning platform specifically designed to assist students with dyslexia by providing personalized learning experiences and tools that cater to their needs, such as advanced text-to-speech and interactive quizzes."
+  },
+  {
+    "question": "What is the ADPI workflow and why is it mandatory?",
+    "answer": "ADPI stands for Analyze-Document-Plan-Implement. It's a mandatory safety protocol to mitigate the risk of the AI Code Agent (ACA) making destructive modifications. It forces a structured process: 1) Analyze the existing code (read-only), 2) Document the findings, 3) Create a detailed implementation plan based on the documentation, and 4) Implement the plan surgically. This prevents regressions and ensures changes are well-contained."
+  },
+  {
+    "question": "Why was the original quiz feature (DUA v1) abandoned?",
+    "answer": "The original quiz feature was a complex, multi-step LangGraph chain that was brittle, difficult to debug, and hard to maintain. It was replaced with Quiz Engine v2, which uses a more robust and predictable single-LLM-call architecture to generate and manage quizzes."
+  },
+  {
+    "question": "What was the root cause of the critical quiz navigation bug?",
+    "answer": "The root cause was improper state management. The ChatPage component was using a local `isQuiz` state variable. When a user navigated away from an active quiz, this local state was not reset, causing the UI to remain stuck in 'Quiz Mode'. The fix was to remove the local state and derive the quiz status from a global `QuizContext`, ensuring a single source of truth."
+  },
+  {
+    "question": "What is the tech stack for LexiAid?",
+    "answer": "LexiAid is a full-stack application. The frontend is built with React, TypeScript, Vite, and Tailwind CSS. The backend is a Python server using Flask and LangGraph for building agentic AI workflows. Firebase is used for user authentication and Firestore for the database. The AI models are accessed via Google's Vertex AI."
+  }
+]

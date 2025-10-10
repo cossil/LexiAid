@@ -1,0 +1,9 @@
+{
+  "LexiAid": "The official name of the AI-powered learning platform for students with dyslexia.",
+  "ACA": "AI Code Agent. The AI assistant responsible for writing, modifying, and debugging the codebase.",
+  "ADPI": "Analyze-Document-Plan-Implement. A mandatory, four-phase workflow designed to ensure safe and structured development by the ACA.",
+  "DUA": "Document Understanding Agent. A term used to describe backend agents responsible for processing and understanding uploaded documents. DUA v1 was an early, complex architecture, while DUA v2 refers to a more streamlined approach.",
+  "Quiz Engine v2": "The second-generation quiz system. It replaced a complex graph with a simplified, more reliable architecture based on a single, comprehensive LLM call.",
+  "Supervisor Graph": "The main routing agent in the LangGraph backend. It receives user requests and decides which specialized sub-graph (e.g., chat graph, quiz engine) should handle the request.",
+  "QuizContext": "A React Context provider that manages the global state of a quiz session (e.g., `quizThreadId`). It serves as the single source of truth for quiz state across the frontend application."
+}

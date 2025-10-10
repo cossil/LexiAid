@@ -1,0 +1,41 @@
+Beginning at the top-left of the document, an image is presented. This image displays four individuals, two adults and two children, all wearing long-sleeved red t-shirts. They are positioned outdoors, with green foliage visible in the background. The individuals are smiling and appear to be flexing their arm muscles. The text on their shirts, repeated on each, reads: "STRONGER THAN DUCHENNE."
+
+Following the image, the main title of the document is presented: "Coverage Options: Types of Private Health Insurance."
+
+Below the title, an introductory paragraph states: "Currently, private insurance plans fall into two categories: group coverage and individual coverage."
+
+The document then proceeds into a two-column layout. The left column is processed first.
+
+Under the heading "Group Plans," the following text appears:
+"Group plans are provided by an employer, government agency, or worker's union while individual plans are negotiated between an individual policyholder and their insurer. Generally, group coverage is less expensive because the provider pays most of the premium for the user. If a group insurance plan is available to you, it will probably provide more comprehensive coverage than an individual plan. This is because group plans pool policies within an organization and ultimately reduce costs for insurers. Under these plans, your family is more likely to be covered for maternity care, well-baby services, preventive care, vision, and dental care. Keep in mind that the way your group plan is set up can make a difference. Group plans are either self-funded or fully insured. What this boils down to is who makes decisions regarding your coverage."
+
+Next, under the heading "Self-Funded vs. Fully Insured Group Plans," the left column continues with two paragraphs:
+"In a self-funded plan your employer pays all medical costs and assumes all risk for its employees. Instead of paying a fat premium to a partner insurance company, self-funded plans are allowed to calculate a maximum annual risk and then keep that amount in reserve until it might be needed. For instance, if it's anticipated that a company's maximum risk is $1.5 million per year, the company is allowed to keep that money and even invest it. At the end of the year, anything that wasn't spent out of these funds goes back into the company coffers."
+
+"In what's called a fully insured plan, an employer partners with an insurance company and pays it a premium to manage its employees' health care claims. The premium amount is based on the company's maximum annual risk, and the insurer assumes all administrative and legal responsibilities related to claims management. If we use the same example as above, the $1.5 million potential risk is paid directly to the insurer, where it remains regardless of what is spent."
+
+The document then transitions to the right column, starting from the top.
+
+The first paragraph in the right column, which continues the discussion from "Self-Funded vs. Fully Insured Group Plans," states:
+"A key difference is that self-funded plans are exempt from state laws, which govern fully insured plans. This leaves your employer with considerable leeway in deciding what kind of coverage you get and whether an expensive procedure or treatment will be approved. If, for example, a benefit included in the plan ends up costing your employer more than they bargained for, they are freely allowed to rescind that benefit if they so choose. State mandates that dictate the breadth of coverage do not apply to these plans."
+
+Below this, under the heading "Individual Plans," the following paragraph appears:
+"Individual plans are sometimes referred to as single-payer plans. You purchase an insurance plan independently from the open market and your employer is not involved. Single-payer plans are generally much more expensive than group coverage and provide limited coverage. While some states created their own state insurance pools where consumers could buy coverage online, the vast majority sell Obamacare-approved plans through Healthcare.gov."
+
+The next paragraph discusses healthcare law:
+"Before the passage of the new healthcare law, individuals who bought coverage on their own would usually have to purchase additional 'riders' to cover specific conditions such as pregnancy. With the passage of the Patient Protection and Affordable Care Act (PPACA), however, all health plans are required to offer a minimum number of 'essential benefits.' The new essentials benefits offered by all healthcare plans in the post-Obamacare era include:"
+
+A bulleted list of essential benefits follows:
+*   "Ambulatory patient services (outpatient care you get without being admitted to a hospital)"
+*   "Emergency services"
+*   "Hospitalization (like surgery and overnight stays)"
+*   "Pregnancy, maternity, and newborn care (both before and after birth)"
+*   "Mental health and substance use disorder services, including behavioral health treatment (this includes counseling and psychotherapy)"
+*   "Prescription drugs"
+*   "Rehabilitative and habilitative services and devices (services and devices to help people with injuries, disabilities, or chronic conditions gain or recover mental and physical skills)"
+*   "Laboratory services"
+*   "Preventive and wellness services and chronic disease management"
+*   "Pediatric services, including oral and vision care (but adult dental and vision coverage aren't essential health benefits)"
+
+Finally, the right column concludes with this paragraph:
+"On top of these essential benefits, Obamacare has broadened the scope of coverage for all Americans. Upon the passage of the PPACA, health insurers can no longer discriminate against individuals or families based on their prior medical conditions or 'pre-existing conditions.' In the past, someone who had cancer or diabetes would be barred from buying new coverage outside of state-sponsored, high-risk pools. But with the new law in place, everyone has access to the same health insurance plans regardless of their health."
