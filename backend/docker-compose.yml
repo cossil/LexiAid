@@ -1,90 +1,103 @@
-version: '3.8'
+# ============================================
+# Master Docker Compose - LexiAid Application
+# ============================================
+version: "3.7"
 
 services:
+
+  ## --------------------------- BACKEND --------------------------- ##
   backend:
+    image: lexiaid-backend:latest
     build:
       context: .
-      dockerfile: Dockerfile
-    image: lexiaid-backend:latest
-    container_name: lexiaid-backend
-    ports:
-      - "5000:5000"
-    
-    # Environment variables - Option 1: Use .env file
+      dockerfile: ./backend/Dockerfile
+    networks:
+      - hankellnet
     env_file:
-      - .env
-    
-    # Environment variables - Option 2: Specify directly (uncomment if not using .env)
-    # environment:
-    #   - GOOGLE_CLOUD_PROJECT_ID=your-project-id
-    #   - DOCUMENT_AI_LOCATION=us
-    #   - LAYOUT_PROCESSOR_ID=your-processor-id
-    #   - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/app/credentials/service-account.json
-    #   - FLASK_ENV=production
-    #   - FLASK_APP=app.py
-    
+      - ./backend/.env
     volumes:
-      # Mount Google Cloud credentials (read-only)
-      # Adjust the path to your actual credentials file location
-      - ./credentials:/app/credentials:ro
-      
-      # Persist database files
-      - lexiaid-data:/app/data
-      
-      # Persist logs
-      - lexiaid-logs:/app/logs
-      
-      # Optional: Mount .env file if not using env_file directive
-      # - ./.env:/app/.env:ro
-    
+      - lexiaid-backend-data:/app/data
+      - lexiaid-backend-logs:/app/logs
+      - ./backend/credentials:/app/credentials:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.lexiaid_backend.rule=Host(`api.hankell.com.br`)"
+        - "traefik.http.routers.lexiaid_backend.entrypoints=websecure"
+        - "traefik.http.routers.lexiaid_backend.priority=2"
+        - "traefik.http.routers.lexiaid_backend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.lexiaid_backend.service=lexiaid_backend"
+        - "traefik.http.services.lexiaid_backend.loadbalancer.server.port=5000"
+        - "traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=true"
     restart: unless-stopped
-    
-    # Health check configuration
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    
-    # Resource limits (adjust based on your needs)
+
+  ## --------------------------- FRONTEND --------------------------- ##
+  frontend:
+    image: lexiaid-frontend:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    networks:
+      - hankellnet
+    depends_on:
+      - backend
     deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
+          cpus: "0.5"
+          memory: 256M
         reservations:
-          cpus: '0.5'
-          memory: 512M
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Network configuration
-    networks:
-      - lexiaid-network
+          cpus: "0.1"
+          memory: 64M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.lexiaid_frontend.rule=Host(`lexiaid.hankell.com.br`)"
+        - "traefik.http.routers.lexiaid_frontend.entrypoints=websecure"
+        - "traefik.http.routers.lexiaid_frontend.priority=1"
+        - "traefik.http.routers.lexiaid_frontend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.lexiaid_frontend.service=lexiaid_frontend"
+        - "traefik.http.services.lexiaid_frontend.loadbalancer.server.port=80"
+        - "traefik.http.services.lexiaid_frontend.loadbalancer.passHostHeader=true"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
-# Named volumes for data persistence
+## --------------------------- VOLUMES --------------------------- ##
 volumes:
-  lexiaid-data:
+  lexiaid-backend-data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data
-  
-  lexiaid-logs:
+  lexiaid-backend-logs:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./logs
 
-# Custom network
+## --------------------------- NETWORKS --------------------------- ##
 networks:
-  lexiaid-network:
-    driver: bridge
+  hankellnet:
+    external: true
+    name: hankellnet
