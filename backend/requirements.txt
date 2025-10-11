@@ -14,7 +14,7 @@ alembic==1.16.1
 langchain==0.3.25
 langchain-core==0.3.62
 langgraph-checkpoint-sqlite
-langgraph-core
+langgraph
 flask-sock==0.7.0
 langgraph==0.4.7
 langchain-google-vertexai==2.0.24
