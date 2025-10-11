@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lexiaid-backend:latest
+    container_name: lexiaid-backend
+    ports:
+      - "5000:5000"
+    
+    # Environment variables - Option 1: Use .env file
+    env_file:
+      - .env
+    
+    # Environment variables - Option 2: Specify directly (uncomment if not using .env)
+    # environment:
+    #   - GOOGLE_CLOUD_PROJECT_ID=your-project-id
+    #   - DOCUMENT_AI_LOCATION=us
+    #   - LAYOUT_PROCESSOR_ID=your-processor-id
+    #   - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/app/credentials/service-account.json
+    #   - FLASK_ENV=production
+    #   - FLASK_APP=app.py
+    
+    volumes:
+      # Mount Google Cloud credentials (read-only)
+      # Adjust the path to your actual credentials file location
+      - ./credentials:/app/credentials:ro
+      
+      # Persist database files
+      - lexiaid-data:/app/data
+      
+      # Persist logs
+      - lexiaid-logs:/app/logs
+      
+      # Optional: Mount .env file if not using env_file directive
+      # - ./.env:/app/.env:ro
+    
+    restart: unless-stopped
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network configuration
+    networks:
+      - lexiaid-network
+
+# Named volumes for data persistence
+volumes:
+  lexiaid-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  
+  lexiaid-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+
+# Custom network
+networks:
+  lexiaid-network:
+    driver: bridge

@@ -113,8 +113,10 @@ class TTSService:
         # Correctly split by double newlines to count actual paragraphs
         paragraphs_in = re.split(r'\n{2,}', text)
         logging.debug(f"TTS_TRACE: CHUNKER INPUT - Total length: {len(text)}, Paragraph count: {len(paragraphs_in)}")
-        logging.debug(f"TTS_TRACE: CHUNKER INPUT - First 100 chars: {text[:100].replace('\n', '[NEWLINE]')}")
-        logging.debug(f"TTS_TRACE: CHUNKER INPUT - Last 100 chars: {text[-100:].replace('\n', '[NEWLINE]')}")
+        chunker_input_first_100 = text[:100].replace('\n', '[NEWLINE]')
+        logging.debug(f"TTS_TRACE: CHUNKER INPUT - First 100 chars: {chunker_input_first_100}")
+        chunker_input_last_100 = text[-100:].replace('\n', '[NEWLINE]')
+        logging.debug(f"TTS_TRACE: CHUNKER INPUT - Last 100 chars: {chunker_input_last_100}")
         
         # Maximum size for any chunk (leaving room for SSML tag overhead)
         max_chunk_size = 2500
@@ -266,8 +268,10 @@ class TTSService:
             # This matches how sanitize_text_for_tts joins paragraphs with '\n\n'
             paragraphs = re.split(r'\n{2,}', plain_text)
             logging.debug(f"TTS_TRACE: SSML_BUILDER - Processing text with {len(paragraphs)} paragraphs, total length: {len(plain_text)}")
-            logging.debug(f"TTS_TRACE: SSML_BUILDER - First 100 chars: {plain_text[:100].replace('\n', '[NEWLINE]')}")
-            logging.debug(f"TTS_TRACE: SSML_BUILDER - Last 100 chars: {plain_text[-100:].replace('\n', '[NEWLINE]')}")
+            ssml_input_first_100 = plain_text[:100].replace('\n', '[NEWLINE]')
+            logging.debug(f"TTS_TRACE: SSML_BUILDER - First 100 chars: {ssml_input_first_100}")
+            ssml_input_last_100 = plain_text[-100:].replace('\n', '[NEWLINE]')
+            logging.debug(f"TTS_TRACE: SSML_BUILDER - Last 100 chars: {ssml_input_last_100}")
             
             # Log paragraph details
             for i, para in enumerate(paragraphs):

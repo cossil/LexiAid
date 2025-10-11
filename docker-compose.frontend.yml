@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lexiaid-frontend:latest
+    container_name: lexiaid-frontend
+    ports:
+      - "80:80"
+      # Alternative port mapping if 80 is in use:
+      # - "8080:80"
+    
+    # Environment variables (if needed by the build)
+    # environment:
+    #   - VITE_BACKEND_API_URL=http://localhost:5000
+    
+    restart: unless-stopped
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network configuration
+    networks:
+      - lexiaid-network
+
+# Custom network
+networks:
+  lexiaid-network:
+    driver: bridge

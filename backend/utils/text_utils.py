@@ -26,8 +26,10 @@ def sanitize_text_for_tts(text: str) -> str:
     # Log input information
     real_paragraph_count = len([p for p in paragraphs if p.strip()])
     logging.debug(f"TTS_TRACE: SANITIZER INPUT - Total length: {len(text)}, Paragraph count: {real_paragraph_count}")
-    logging.debug(f"TTS_TRACE: SANITIZER INPUT - First 100 chars: {text[:100].replace('\n', '[NEWLINE]')}")
-    logging.debug(f"TTS_TRACE: SANITIZER INPUT - Last 100 chars: {text[-100:].replace('\n', '[NEWLINE]')}")
+    input_first_100 = text[:100].replace('\n', '[NEWLINE]')
+    logging.debug(f"TTS_TRACE: SANITIZER INPUT - First 100 chars: {input_first_100}")
+    input_last_100 = text[-100:].replace('\n', '[NEWLINE]')
+    logging.debug(f"TTS_TRACE: SANITIZER INPUT - Last 100 chars: {input_last_100}")
     
     # Step 2: Initialize the list for sanitized paragraphs
     sanitized_paragraphs = []
@@ -96,8 +98,10 @@ def sanitize_text_for_tts(text: str) -> str:
     result_paragraphs = re.split(r'\n{2,}', result)
     real_paragraph_count = len([p for p in result_paragraphs if p.strip()])
     logging.debug(f"TTS_TRACE: SANITIZER OUTPUT - Total length: {len(result)}, Paragraph count: {real_paragraph_count}")
-    logging.debug(f"TTS_TRACE: SANITIZER OUTPUT - First 100 chars: {result[:100].replace('\n', '[NEWLINE]')}")
-    logging.debug(f"TTS_TRACE: SANITIZER OUTPUT - Last 100 chars: {result[-100:].replace('\n', '[NEWLINE]')}")
+    output_first_100 = result[:100].replace('\n', '[NEWLINE]')
+    logging.debug(f"TTS_TRACE: SANITIZER OUTPUT - First 100 chars: {output_first_100}")
+    output_last_100 = result[-100:].replace('\n', '[NEWLINE]')
+    logging.debug(f"TTS_TRACE: SANITIZER OUTPUT - Last 100 chars: {output_last_100}")
     
     # Log truncated full content for debugging
     max_log_length = min(5000, len(result))
