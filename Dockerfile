@@ -21,7 +21,7 @@ COPY package.json package-lock.json* ./
 
 # Install dependencies
 # Use --legacy-peer-deps if there are peer dependency conflicts
-RUN npm ci --only=production=false --no-audit --no-fund
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -67,7 +67,7 @@ EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:80/ || exit 1
+    CMD curl -f http://localhost/health || exit 1
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
