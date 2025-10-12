@@ -7,8 +7,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 # Imports relative to the 'supervisor' package or its parent 'graphs'
 from .state import SupervisorState
-from ..new_chat_graph import GeneralQueryState # State for the new_chat_graph
-from ..quiz_engine_graph import QuizEngineState # State for the Quiz Engine v2
+from graphs.new_chat_graph import GeneralQueryState # State for the new_chat_graph
+from graphs.quiz_engine_graph import QuizEngineState # State for the Quiz Engine v2
 
 DEFAULT_MAX_QUIZ_QUESTIONS = 5
 

@@ -1,6 +1,6 @@
 from typing import List, TypedDict, Optional, Literal, Any, Dict, NotRequired
 from langchain_core.messages import BaseMessage
-from backend.graphs.quiz_engine_graph import QuizEngineState
+from graphs.quiz_engine_graph import QuizEngineState
 
 class SupervisorState(TypedDict):
     """State for the Supervisor Graph."""

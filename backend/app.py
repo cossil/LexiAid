@@ -70,11 +70,11 @@ from services import (AuthService, FirestoreService, StorageService,
 # The LangGraph-based Supervisor architecture (supervisor_graph.py) now handles all agent functionality.
 # Kept for reference or potential future use. Can be removed if not needed.
 
-from backend.graphs.new_chat_graph import create_new_chat_graph # For general chat functionality
-from backend.graphs.quiz_engine_graph import create_quiz_engine_graph # For Quiz Engine V2
-from backend.graphs.supervisor import create_supervisor_graph
-from backend.graphs.supervisor.state import SupervisorState
-from backend.graphs.answer_formulation.graph import create_answer_formulation_graph # For Answer Formulation
+from graphs.new_chat_graph import create_new_chat_graph # For general chat functionality
+from graphs.quiz_engine_graph import create_quiz_engine_graph # For Quiz Engine V2
+from graphs.supervisor import create_supervisor_graph
+from graphs.supervisor.state import SupervisorState
+from graphs.answer_formulation.graph import create_answer_formulation_graph # For Answer Formulation
 from langgraph.checkpoint.sqlite import SqliteSaver
 # import os # os is already imported
 from langchain_core.messages import HumanMessage, AIMessage

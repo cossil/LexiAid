@@ -13,7 +13,7 @@ logging.basicConfig(
 logger = logging.getLogger("ai_tutor_app") # Or a more specific name
 
 # Example of how to use the logger in other modules:
-# from backend.utils.logging_utils import logger
+# from utils.logging_utils import logger
 # logger.info("This is an info message.")
 # logger.debug("This is a debug message.")
 # logger.warning("This is a warning message.")

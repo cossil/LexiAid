@@ -31,7 +31,7 @@ if __package__ is None or __package__ == '': # Check if running as a script
     )
     if _project_root_for_import not in sys.path:
         sys.path.insert(0, _project_root_for_import)
-    from backend.graphs.document_understanding_agent.state import DocumentUnderstandingState
+    from graphs.document_understanding_agent.state import DocumentUnderstandingState
 else:
     # Running as a module within a package, relative import is fine
     from .state import DocumentUnderstandingState
