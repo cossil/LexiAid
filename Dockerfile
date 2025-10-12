@@ -20,8 +20,8 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-# Use npm install to ensure devDependencies (like vite) are installed
-RUN npm install
+# Explicitly include devDependencies (like vite) even in production mode
+RUN npm install --include=dev
 
 # Copy source code
 COPY . .
