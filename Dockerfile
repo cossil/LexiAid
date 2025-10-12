@@ -20,8 +20,8 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-# Use --legacy-peer-deps if there are peer dependency conflicts
-RUN npm ci
+# Use npm install to ensure devDependencies (like vite) are installed
+RUN npm install
 
 # Copy source code
 COPY . .
