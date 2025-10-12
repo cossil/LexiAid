@@ -26,6 +26,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build argument for backend API URL
+ARG VITE_BACKEND_API_URL
+ENV VITE_BACKEND_API_URL=${VITE_BACKEND_API_URL}
+
 # Build the application
 # Vite will output to /app/dist by default
 RUN npm run build
