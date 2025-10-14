@@ -13,13 +13,13 @@ from typing import Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .state import AnswerFormulationState
-from .prompts import (
+from backend.graphs.answer_formulation.state import AnswerFormulationState
+from backend.graphs.answer_formulation.prompts import (
     REFINEMENT_SYSTEM_PROMPT,
     EDIT_SYSTEM_PROMPT,
     VALIDATION_PROMPT
 )
-from .utils import (
+from backend.graphs.answer_formulation.utils import (
     parse_edit_command,
     extract_fidelity_score,
     extract_violations

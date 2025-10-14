@@ -9,7 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 
-from ..services.doc_retrieval_service import DocumentRetrievalService
+from backend.services.doc_retrieval_service import DocumentRetrievalService
 
 # Load environment variables
 load_dotenv()

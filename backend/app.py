@@ -8,11 +8,6 @@ import google.cloud.texttospeech  # Pre-emptive import to resolve conflict
 import os
 import sys
 
-# Add project root to sys.path for consistent absolute imports
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
 import atexit
 import logging
 from typing import Set, Optional
@@ -27,7 +22,7 @@ from flask import current_app
 from dotenv import load_dotenv
 from flask import send_file
 import base64
-from services.tts_service import TTSService, TTSServiceError
+from backend.services.tts_service import TTSService, TTSServiceError
 import io
 # Construct the path to .env in the same directory as app.py
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -63,18 +58,18 @@ import json
 from firebase_admin import credentials, firestore
 import firebase_admin
 
-# Use relative imports when running as a module
-from services import (AuthService, FirestoreService, StorageService, 
+# Use absolute imports from backend package
+from backend.services import (AuthService, FirestoreService, StorageService, 
                       DocAIService, DocumentRetrievalService, TTSService, STTService)
 # Note: AiTutorAgent (ReAct-based) was previously imported here but is no longer used by the application.
 # The LangGraph-based Supervisor architecture (supervisor_graph.py) now handles all agent functionality.
 # Kept for reference or potential future use. Can be removed if not needed.
 
-from graphs.new_chat_graph import create_new_chat_graph # For general chat functionality
-from graphs.quiz_engine_graph import create_quiz_engine_graph # For Quiz Engine V2
-from graphs.supervisor import create_supervisor_graph
-from graphs.supervisor.state import SupervisorState
-from graphs.answer_formulation.graph import create_answer_formulation_graph # For Answer Formulation
+from backend.graphs.new_chat_graph import create_new_chat_graph # For general chat functionality
+from backend.graphs.quiz_engine_graph import create_quiz_engine_graph # For Quiz Engine V2
+from backend.graphs.supervisor import create_supervisor_graph
+from backend.graphs.supervisor.state import SupervisorState
+from backend.graphs.answer_formulation.graph import create_answer_formulation_graph # For Answer Formulation
 from langgraph.checkpoint.sqlite import SqliteSaver
 # import os # os is already imported
 from langchain_core.messages import HumanMessage, AIMessage
@@ -82,13 +77,13 @@ from langchain_core.runnables.graph import MermaidDrawMethod
 from langchain_core.runnables import RunnableConfig
 from functools import wraps # Added for auth decorator
 
-# Import Blueprints using relative paths
-from routes.document_routes import document_bp
-from routes.tts_routes import tts_bp
-from routes.stt_routes import stt_bp
-from routes.user_routes import user_bp
-from routes.progress_routes import progress_bp
-from routes.answer_formulation_routes import answer_formulation_bp
+# Import Blueprints using absolute paths
+from backend.routes.document_routes import document_bp
+from backend.routes.tts_routes import tts_bp
+from backend.routes.stt_routes import stt_bp
+from backend.routes.user_routes import user_bp
+from backend.routes.progress_routes import progress_bp
+from backend.routes.answer_formulation_routes import answer_formulation_bp
 
 app = Flask(__name__)
 sock = Sock(app)

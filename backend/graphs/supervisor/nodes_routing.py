@@ -3,18 +3,18 @@ import uuid
 from typing import Any, Optional, Dict, Tuple
 
 from langchain_core.messages import HumanMessage
-from ...services.stt_service import STTService 
+from backend.services.stt_service import STTService 
 from google.cloud import speech
 import base64
 
-from .state import SupervisorState
-from .utils import (
+from backend.graphs.supervisor.state import SupervisorState
+from backend.graphs.supervisor.utils import (
     is_cancel_query,
     is_document_understanding_query,
     is_quiz_start_query,
     extract_document_id 
 )
-from ...services.doc_retrieval_service import DocumentRetrievalService
+from backend.services.doc_retrieval_service import DocumentRetrievalService
 
 # QUIZ_LENGTH constant removed as max_questions is handled by QuizEngineState/invoker
 

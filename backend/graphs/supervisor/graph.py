@@ -3,15 +3,15 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 import functools
-from .state import SupervisorState
+from backend.graphs.supervisor.state import SupervisorState
 
 # New simplified graph imports
-from ..quiz_engine_graph import QuizEngineState as NewQuizState, create_quiz_engine_graph
-from ..new_chat_graph import GeneralQueryState as NewGeneralQueryState, create_new_chat_graph
+from backend.graphs.quiz_engine_graph import QuizEngineState as NewQuizState, create_quiz_engine_graph
+from backend.graphs.new_chat_graph import GeneralQueryState as NewGeneralQueryState, create_new_chat_graph
 
-from ...services.doc_retrieval_service import DocumentRetrievalService
-from .nodes_routing import receive_user_input_node, routing_decision_node
-from .nodes_invokers import invoke_new_chat_graph_node, invoke_quiz_engine_graph_node
+from backend.services.doc_retrieval_service import DocumentRetrievalService
+from backend.graphs.supervisor.nodes_routing import receive_user_input_node, routing_decision_node
+from backend.graphs.supervisor.nodes_invokers import invoke_new_chat_graph_node, invoke_quiz_engine_graph_node
 
 import json
 import re

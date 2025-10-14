@@ -47,6 +47,7 @@ FROM python:3.12-slim AS final
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app \
     FLASK_APP=app.py \
     FLASK_ENV=production
 

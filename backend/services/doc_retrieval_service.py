@@ -10,8 +10,8 @@ import json
 from typing import Dict, List, Any, Optional, Union, Tuple, BinaryIO
 
 # Import required services
-from .firestore_service import FirestoreService
-from .storage_service import StorageService
+from backend.services.firestore_service import FirestoreService
+from backend.services.storage_service import StorageService
 
 class DocumentRetrievalService:
     """

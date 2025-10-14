@@ -18,23 +18,8 @@ from vertexai.generative_models import GenerativeModel, Part, GenerationConfig, 
 # LangGraph
 from langgraph.graph import StateGraph, END
 
-# State
-# Assuming state.py is in the same directory or Python path is configured
-import sys
-import os
-
-if __package__ is None or __package__ == '': # Check if running as a script
-    # Get the project root directory by going up three levels from the current script's directory
-    # __file__ -> document_understanding_agent -> graphs -> backend -> project_root
-    _project_root_for_import = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', '..', '..')
-    )
-    if _project_root_for_import not in sys.path:
-        sys.path.insert(0, _project_root_for_import)
-    from graphs.document_understanding_agent.state import DocumentUnderstandingState
-else:
-    # Running as a module within a package, relative import is fine
-    from .state import DocumentUnderstandingState
+# State - use absolute import
+from backend.graphs.document_understanding_agent.state import DocumentUnderstandingState
 
 # --- Initialize Vertex AI ---
 # This section attempts to initialize Vertex AI.
