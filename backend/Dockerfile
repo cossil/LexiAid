@@ -101,4 +101,4 @@ CMD ["gunicorn", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
      "--log-level", "info", \
-     "app:app"]
+     "backend.app:app"]
