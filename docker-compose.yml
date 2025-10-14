@@ -1,42 +1,24 @@
 # ============================================
 # Master Docker Compose - LexiAid Application
 # ============================================
-# This file orchestrates the deployment of the entire LexiAid application
-# (frontend and backend) with Traefik reverse proxy integration.
-#
-# Network: hankellnet (external)
-# SSL: Let's Encrypt via Traefik
-# Domains:
-#   - Frontend: lexiaid.hankell.com.br
-#   - Backend API: api.lexiaid.hankell.com.br
-
 version: "3.7"
 
 services:
 
-## --------------------------- BACKEND --------------------------- ##
-
+  ## --------------------------- BACKEND --------------------------- ##
   backend:
     image: lexiaid-backend:latest
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: lexiaid-backend
-
+      context: .
+      dockerfile: ./backend/Dockerfile
     networks:
       - hankellnet
-
-    # Environment variables for backend
-    # Load from .env file in backend directory
     env_file:
       - ./backend/.env
-
-    # Persist database and logs
     volumes:
       - lexiaid-backend-data:/app/data
       - lexiaid-backend-logs:/app/logs
       - ./backend/credentials:/app/credentials:ro
-
     deploy:
       mode: replicated
       replicas: 1
@@ -51,22 +33,15 @@ services:
           cpus: "0.5"
           memory: 512M
       labels:
-        # Enable Traefik
-        - traefik.enable=true
-        
-        # Router configuration for API subdomain
-        - traefik.http.routers.lexiaid_backend.rule=Host(`api.lexiaid.hankell.com.br`)
-        - traefik.http.routers.lexiaid_backend.entrypoints=websecure
-        - traefik.http.routers.lexiaid_backend.priority=1
-        - traefik.http.routers.lexiaid_backend.tls.certresolver=letsencryptresolver
-        - traefik.http.routers.lexiaid_backend.service=lexiaid_backend
-        
-        # Service configuration
-        - traefik.http.services.lexiaid_backend.loadbalancer.server.port=5000
-        - traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=1
-
+        - "traefik.enable=true"
+        - "traefik.http.routers.lexiaid_backend.rule=Host(`api.hankell.com.br`)"
+        - "traefik.http.routers.lexiaid_backend.entrypoints=websecure"
+        - "traefik.http.routers.lexiaid_backend.priority=2"
+        - "traefik.http.routers.lexiaid_backend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.lexiaid_backend.service=lexiaid_backend"
+        - "traefik.http.services.lexiaid_backend.loadbalancer.server.port=5000"
+        - "traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=true"
     restart: unless-stopped
-
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
       interval: 30s
@@ -74,30 +49,25 @@ services:
       retries: 3
       start_period: 40s
 
-## --------------------------- FRONTEND --------------------------- ##
-
+  ## --------------------------- FRONTEND --------------------------- ##
   frontend:
     image: lexiaid-frontend:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
       args:
-        - VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY}
-        - VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN}
-        - VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID}
-        - VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET}
-        - VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID}
-        - VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID}
-        - VITE_BACKEND_API_URL=https://api.hankell.com.br
-    container_name: lexiaid-frontend
-
+        # These values are pulled from the .env file in the root and passed into the build process
+        - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+        - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
+        - VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+        - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
+        - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
+        - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
+        - VITE_BACKEND_API_URL=${VITE_BACKEND_API_URL}
     networks:
       - hankellnet
-
-    # Frontend depends on backend being available
     depends_on:
       - backend
-
     deploy:
       mode: replicated
       replicas: 1
@@ -112,22 +82,15 @@ services:
           cpus: "0.1"
           memory: 64M
       labels:
-        # Enable Traefik
-        - traefik.enable=true
-        
-        # Router configuration for main domain
-        - traefik.http.routers.lexiaid_frontend.rule=Host(`lexiaid.hankell.com.br`)
-        - traefik.http.routers.lexiaid_frontend.entrypoints=websecure
-        - traefik.http.routers.lexiaid_frontend.priority=1
-        - traefik.http.routers.lexiaid_frontend.tls.certresolver=letsencryptresolver
-        - traefik.http.routers.lexiaid_frontend.service=lexiaid_frontend
-        
-        # Service configuration
-        - traefik.http.services.lexiaid_frontend.loadbalancer.server.port=80
-        - traefik.http.services.lexiaid_frontend.loadbalancer.passHostHeader=1
-
+        - "traefik.enable=true"
+        - "traefik.http.routers.lexiaid_frontend.rule=Host(`lexiaid.hankell.com.br`)"
+        - "traefik.http.routers.lexiaid_frontend.entrypoints=websecure"
+        - "traefik.http.routers.lexiaid_frontend.priority=1"
+        - "traefik.http.routers.lexiaid_frontend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.lexiaid_frontend.service=lexiaid_frontend"
+        - "traefik.http.services.lexiaid_frontend.loadbalancer.server.port=80"
+        - "traefik.http.services.lexiaid_frontend.loadbalancer.passHostHeader=true"
     restart: unless-stopped
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
@@ -136,7 +99,6 @@ services:
       start_period: 5s
 
 ## --------------------------- VOLUMES --------------------------- ##
-
 volumes:
   lexiaid-backend-data:
     driver: local
@@ -144,7 +106,6 @@ volumes:
     driver: local
 
 ## --------------------------- NETWORKS --------------------------- ##
-
 networks:
   hankellnet:
     external: true
