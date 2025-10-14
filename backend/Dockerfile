@@ -68,7 +68,7 @@ WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 
 # Copy application code
-COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser . ./backend
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/data/db /app/debug_audio /app/logs && \
