@@ -47,7 +47,7 @@ FROM python:3.12-slim AS final
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
-    FLASK_APP=backend.app \
+    FLASK_APP=app.py \
     FLASK_ENV=production
 
 # Install runtime dependencies only (if needed by Google Cloud libraries)
@@ -76,6 +76,9 @@ RUN mkdir -p /app/data/db /app/debug_audio /app/logs && \
 # Switch to non-root user
 USER appuser
 
+# Change to backend directory for correct Python import paths
+WORKDIR /app/backend
+
 # Expose the application port
 EXPOSE 5000
 
@@ -97,4 +100,4 @@ CMD ["gunicorn", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
      "--log-level", "info", \
-     "backend.app:app"]
+     "app:app"]
