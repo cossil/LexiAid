@@ -11,7 +11,7 @@ import uuid
 import logging
 import base64
 
-from routes.document_routes import auth_required
+from .document_routes import auth_required
 
 logger = logging.getLogger(__name__)
 

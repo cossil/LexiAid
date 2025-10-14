@@ -6,10 +6,10 @@ import functools
 from .state import SupervisorState
 
 # New simplified graph imports
-from graphs.quiz_engine_graph import QuizEngineState as NewQuizState, create_quiz_engine_graph
-from graphs.new_chat_graph import GeneralQueryState as NewGeneralQueryState, create_new_chat_graph
+from ..quiz_engine_graph import QuizEngineState as NewQuizState, create_quiz_engine_graph
+from ..new_chat_graph import GeneralQueryState as NewGeneralQueryState, create_new_chat_graph
 
-from services.doc_retrieval_service import DocumentRetrievalService
+from ...services.doc_retrieval_service import DocumentRetrievalService
 from .nodes_routing import receive_user_input_node, routing_decision_node
 from .nodes_invokers import invoke_new_chat_graph_node, invoke_quiz_engine_graph_node
 

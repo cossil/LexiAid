@@ -16,7 +16,7 @@ import json # For DUA output handling
 # from ..services import FirestoreService, StorageService # Example structure
 
 from google.cloud import documentai_v1 as documentai
-from graphs.document_understanding_agent.graph import DocumentUnderstandingState, run_dua_processing_for_document
+from ..graphs.document_understanding_agent.graph import DocumentUnderstandingState, run_dua_processing_for_document
 
 # from utilities.benchmark import STime # Assuming STime is for benchmarking
 # from utilities.prepare_response_text import prepare_response_text # Assuming utility function

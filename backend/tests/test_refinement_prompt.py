@@ -14,7 +14,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from graphs.answer_formulation.prompts import REFINEMENT_SYSTEM_PROMPT
+from ..graphs.answer_formulation.prompts import REFINEMENT_SYSTEM_PROMPT
 from datetime import datetime
 
 

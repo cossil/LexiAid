@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Optional, Dict, Tuple
 
 from langchain_core.messages import HumanMessage
-from services.stt_service import STTService 
+from ...services.stt_service import STTService 
 from google.cloud import speech
 import base64
 
@@ -14,7 +14,7 @@ from .utils import (
     is_quiz_start_query,
     extract_document_id 
 )
-from services.doc_retrieval_service import DocumentRetrievalService
+from ...services.doc_retrieval_service import DocumentRetrievalService
 
 # QUIZ_LENGTH constant removed as max_questions is handled by QuizEngineState/invoker
 

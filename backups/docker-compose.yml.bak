@@ -1,0 +1,145 @@
+# ============================================
+# Master Docker Compose - LexiAid Application
+# ============================================
+# This file orchestrates the deployment of the entire LexiAid application
+# (frontend and backend) with Traefik reverse proxy integration.
+#
+# Network: hankellnet (external)
+# SSL: Let's Encrypt via Traefik
+# Domains:
+#   - Frontend: lexiaid.hankell.com.br
+#   - Backend API: api.lexiaid.hankell.com.br
+
+version: "3.7"
+
+services:
+
+## --------------------------- BACKEND --------------------------- ##
+
+  backend:
+    image: lexiaid-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lexiaid-backend
+
+    networks:
+      - hankellnet
+
+    # Environment variables for backend
+    # Load from .env file in backend directory
+    env_file:
+      - ./backend/.env
+
+    # Persist database and logs
+    volumes:
+      - lexiaid-backend-data:/app/data
+      - lexiaid-backend-logs:/app/logs
+      - ./backend/credentials:/app/credentials:ro
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+      labels:
+        # Enable Traefik
+        - traefik.enable=true
+        
+        # Router configuration for API subdomain
+        - traefik.http.routers.lexiaid_backend.rule=Host(`api.lexiaid.hankell.com.br`)
+        - traefik.http.routers.lexiaid_backend.entrypoints=websecure
+        - traefik.http.routers.lexiaid_backend.priority=1
+        - traefik.http.routers.lexiaid_backend.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.lexiaid_backend.service=lexiaid_backend
+        
+        # Service configuration
+        - traefik.http.services.lexiaid_backend.loadbalancer.server.port=5000
+        - traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=1
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+## --------------------------- FRONTEND --------------------------- ##
+
+  frontend:
+    image: lexiaid-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_API_URL=https://api.hankell.com.br
+    container_name: lexiaid-frontend
+
+    networks:
+      - hankellnet
+
+    # Frontend depends on backend being available
+    depends_on:
+      - backend
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+      labels:
+        # Enable Traefik
+        - traefik.enable=true
+        
+        # Router configuration for main domain
+        - traefik.http.routers.lexiaid_frontend.rule=Host(`lexiaid.hankell.com.br`)
+        - traefik.http.routers.lexiaid_frontend.entrypoints=websecure
+        - traefik.http.routers.lexiaid_frontend.priority=1
+        - traefik.http.routers.lexiaid_frontend.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.lexiaid_frontend.service=lexiaid_frontend
+        
+        # Service configuration
+        - traefik.http.services.lexiaid_frontend.loadbalancer.server.port=80
+        - traefik.http.services.lexiaid_frontend.loadbalancer.passHostHeader=1
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+## --------------------------- VOLUMES --------------------------- ##
+
+volumes:
+  lexiaid-backend-data:
+    driver: local
+  lexiaid-backend-logs:
+    driver: local
+
+## --------------------------- NETWORKS --------------------------- ##
+
+networks:
+  hankellnet:
+    external: true
+    name: hankellnet

@@ -31,7 +31,7 @@ import logging
 from google.cloud import texttospeech_v1beta1 as texttospeech
 from google.oauth2 import service_account
 from dotenv import load_dotenv
-from utils.text_utils import sanitize_text_for_tts
+from ..utils.text_utils import sanitize_text_for_tts
 
 # Load environment variables
 load_dotenv()
