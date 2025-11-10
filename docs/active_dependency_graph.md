@@ -1,362 +1,313 @@
 # Active Dependency Graph
 
-## Full-Stack Feature Tracing
+## Overview
+This document maps the active codebase dependencies using flowcharts to show the full-stack trace for each major feature in the LexiAid application.
 
-### Feature 1: Document Upload & Processing
+## Feature: Chat System
 
-#### Frontend Flow
+### Frontend Chat Flow
+```
+ChatPage.tsx
+├── useAccessibility() (AccessibilityContext)
+├── apiService.chat() → POST /api/v2/agent/chat
+├── GeminiChatInterface.tsx
+│   ├── useRealtimeStt() → WebSocket /api/stt/stream
+│   │   └── useAudioRecorder() → MediaRecorder API
+│   ├── useChatTTSPlayer() → HTML5 Audio
+│   ├── useOnDemandTTSPlayer() → apiService.synthesizeText()
+│   └── MicrophoneButton.tsx
+│       ├── useAudioRecorder()
+│       └── apiService.uploadAudioMessage()
+└── ChatMessage[] (State)
+```
+
+### Backend Chat Flow
+```
+/api/v2/agent/chat (routes)
+├── auth_required decorator → AuthService.verify_id_token()
+├── supervisor_graph (graphs/supervisor/)
+│   ├── new_chat_graph (graphs/new_chat_graph.py)
+│   │   ├── ChatGoogleGenerativeAI (LLM)
+│   │   └── DocumentRetrievalService.get_document_content()
+│   └── quiz_engine_graph (graphs/quiz_engine_graph.py)
+│       ├── ChatGoogleGenerativeAI (LLM)
+│       └── QuizEngineState management
+├── TTSService.synthesize_speech() (if audio requested)
+└── Response with audio_content_base64 and timepoints
+```
+
+### Data Flow
+```
+User Input → STT → LLM Processing → TTS → Audio Output
+     ↓              ↓              ↓          ↓
+Microphone → WebSocket → LangGraph → Google Cloud → HTML5 Audio
+```
+
+---
+
+## Feature: Document Upload
+
+### Frontend Upload Flow
 ```
 DocumentUpload.tsx
-  └─> apiService.uploadDocument(file, metadata)
-      └─> POST /api/documents/upload (multipart/form-data)
+├── useAuth() (AuthContext)
+├── useAccessibility() (AccessibilityContext)
+├── File Upload Handling
+│   ├── File validation (type, size)
+│   └── Progress tracking
+└── apiService.uploadDocument() → POST /api/documents
+    ├── FormData construction
+    └── Authentication token injection
 ```
 
-#### Backend Flow
+### Backend Upload Flow
 ```
-document_routes.py::upload_document()
-  ├─> FirestoreService.save_document() - Create initial entry
-  ├─> StorageService.upload_file() - Upload to GCS
-  ├─> DUA Processing (if eligible: pdf, png, jpg, jpeg)
-  │   ├─> run_dua_processing_for_document() [graphs/document_understanding_agent/graph.py]
-  │   │   ├─> StorageService.get_file() - Download image
-  │   │   ├─> Vertex AI Gemini 2.5 Flash - Generate narrative
-  │   │   └─> Returns: tts_ready_narrative
-  │   ├─> TTSService.synthesize_text() - Pre-generate audio
-  │   ├─> StorageService.upload_bytes_as_file() - Save audio
-  │   ├─> StorageService.upload_string_as_file() - Save timepoints
-  │   └─> FirestoreService.update_document() - Save URIs
-  └─> OCR Fallback (if DUA fails or not eligible)
-      ├─> OCRTool.process_document() [DEPRECATED - Tool not initialized]
-      └─> FirestoreService.update_document() - Save OCR text
+/api/documents (routes/document_routes.py)
+├── auth_required decorator
+├── File validation and storage
+│   ├── StorageService.upload_file() → Google Cloud Storage
+│   └── DocAIService.extract_text() → Document AI
+├── FirestoreService.create_document()
+├── DocumentUnderstandingState processing
+└── TTSService.pre_generate_audio() (optional)
+    ├── Text chunking
+    └── Google Cloud Text-to-Speech
 ```
 
-**Active Services**: FirestoreService, StorageService, TTSService, DUA Graph
-**Deprecated**: OCRTool (referenced but not initialized in app.py)
-
----
-
-### Feature 2: Document Viewing with TTS
-
-#### Frontend Flow
+### Processing Pipeline
 ```
-DocumentView.tsx
-  ├─> useEffect: setActiveDocumentId(id) [DocumentContext]
-  ├─> axios.get(`/api/documents/${id}?include_content=true`)
-  └─> useTTSPlayer(documentId, content)
-      ├─> Try: apiService.getTtsAssets(documentId)
-      │   └─> GET /api/documents/{id}/tts-assets
-      └─> Fallback: apiService.synthesizeText(fullText)
-          └─> POST /api/tts/synthesize
-```
-
-#### Backend Flow
-```
-document_routes.py::get_document()
-  └─> DocumentRetrievalService.get_document_content(document_id)
-      ├─> FirestoreService.get_document() - Get metadata
-      ├─> Priority 1: Check 'dua_narrative_content' (status='processed_dua')
-      ├─> Priority 2: Check 'ocr_text_content' (status='processed')
-      ├─> Priority 3: StorageService.get_file(gcs_uri) - Download from GCS
-      └─> Priority 4: FirestoreService.get_document_content_from_subcollection()
-
-tts_routes.py::synthesize()
-  └─> TTSService.synthesize_text(text, voice, rate, pitch)
-      ├─> sanitize_text_for_tts() [utils/text_utils.py]
-      ├─> _chunk_text() - Split into 2500 char chunks
-      ├─> _build_ssml_and_map() - Generate SSML with marks
-      ├─> Google Cloud TTS API - Synthesize each chunk
-      └─> Returns: {audio_content, timepoints}
-```
-
-**Active Services**: DocumentRetrievalService, FirestoreService, StorageService, TTSService
-
----
-
-### Feature 3: Chat with Document
-
-#### Frontend Flow
-```
-ChatPage.tsx
-  ├─> useEffect: Fetch document details
-  ├─> handleSendMessage(messageText)
-  │   └─> apiService.chat({ query, documentId, threadId })
-  │       └─> POST /api/v2/agent/chat (JSON)
-  └─> handleAudioSend(audioBlob, transcript)
-      └─> apiService.uploadAudioMessage(formData)
-          └─> POST /api/v2/agent/chat (multipart)
-```
-
-#### Backend Flow
-```
-app.py::agent_chat_route()
-  ├─> @require_auth - Verify Firebase token
-  ├─> Parse input (text or audio)
-  │   ├─> If audio: STTService.transcribe_audio_bytes()
-  │   └─> Extract effective_query
-  ├─> DatabaseManager - Get compiled_supervisor_graph
-  ├─> Create/retrieve SupervisorState
-  │   ├─> If new thread: Create thread_id
-  │   └─> If existing: Load state from checkpointer
-  ├─> compiled_supervisor_graph.invoke(supervisor_input, config)
-  │   │
-  │   ├─> supervisor/graph.py::receive_user_input_node()
-  │   ├─> supervisor/graph.py::routing_decision_node()
-  │   │   └─> Determines: "new_chat_graph" or "quiz_engine_graph"
-  │   │
-  │   ├─> If chat: invoke_new_chat_graph_node()
-  │   │   └─> new_chat_graph.py::call_chat_llm_node()
-  │   │       ├─> DocumentRetrievalService.get_document_content()
-  │   │       ├─> distill_conversation_history()
-  │   │       ├─> ChatGoogleGenerativeAI(model="gemini-2.5-flash", temp=0.7)
-  │   │       └─> Returns: response
-  │   │
-  │   └─> If quiz: invoke_quiz_engine_graph_node()
-  │       └─> quiz_engine_graph.py::call_quiz_engine_node()
-  │           ├─> If status="generating_first_question"
-  │           │   └─> Gemini 2.5 Flash (temp=0.7) - Generate question
-  │           └─> If status="evaluating_answer"
-  │               └─> Gemini 2.5 Flash (temp=0.3) - Evaluate + next Q
-  │
-  ├─> TTSService.synthesize_text(response_text) - Generate audio
-  └─> Returns: {response, thread_id, audio_content_base64, timepoints, quiz_active}
-```
-
-**Active Services**: STTService, DocumentRetrievalService, TTSService
-**Active Graphs**: SupervisorGraph, NewChatGraph, QuizEngineGraph
-
----
-
-### Feature 4: Quiz Generation & Interaction
-
-#### Frontend Flow
-```
-ChatPage.tsx::handleStartQuiz()
-  └─> apiService.chat({ query: '/start_quiz', documentId, threadId })
-      └─> POST /api/v2/agent/chat
-
-User answers question:
-ChatPage.tsx::handleSendMessage(answer)
-  └─> apiService.chat({ query: answer, documentId, threadId })
-      └─> POST /api/v2/agent/chat
-```
-
-#### Backend Flow
-```
-app.py::agent_chat_route()
-  └─> SupervisorGraph routing detects quiz intent
-      └─> invoke_quiz_engine_graph_node()
-          └─> quiz_engine_graph.py::call_quiz_engine_node()
-              │
-              ├─> First Question Generation:
-              │   ├─> DocumentRetrievalService.get_document_content_for_quiz()
-              │   ├─> Gemini 2.5 Flash (temp=0.7)
-              │   ├─> PydanticOutputParser validates LLMQuizResponse
-              │   └─> Returns: {question_text, options, correct_answer_index}
-              │
-              ├─> Answer Evaluation:
-              │   ├─> Compare user_answer with correct_answer
-              │   ├─> Gemini 2.5 Flash (temp=0.3)
-              │   ├─> Update quiz_history
-              │   ├─> Increment score if correct
-              │   └─> Generate next question or final_summary
-              │
-              └─> State Updates:
-                  ├─> current_question_to_display
-                  ├─> current_feedback_to_display
-                  ├─> status: "awaiting_answer" | "quiz_completed"
-                  └─> Checkpointed in quiz_checkpoints.db
-```
-
-**Active Services**: DocumentRetrievalService
-**Active Graphs**: SupervisorGraph, QuizEngineGraph
-**LLM Models**: Gemini 2.5 Flash (dual temperatures)
-
----
-
-### Feature 5: Real-time Speech-to-Text
-
-#### Frontend Flow
-```
-GeminiChatInterface.tsx::ChatInputBar
-  └─> useRealtimeStt()
-      ├─> startDictation()
-      │   ├─> navigator.mediaDevices.getUserMedia()
-      │   ├─> WebSocket: ws://backend/api/stt/stream
-      │   ├─> MediaRecorder (webm/opus, 16kHz)
-      │   └─> Send audio chunks via WebSocket
-      └─> Receive transcript updates
-          └─> Update transcript.final and transcript.interim
-```
-
-#### Backend Flow
-```
-app.py::stt_stream() [@sock.route('/api/stt/stream')]
-  ├─> WebSocket connection established
-  ├─> Create speech.StreamingRecognitionConfig
-  │   ├─> encoding: WEBM_OPUS
-  │   ├─> sample_rate: 16000
-  │   ├─> language: en-US
-  │   └─> enable_automatic_punctuation: True
-  ├─> request_generator() - Yields audio chunks from WebSocket
-  ├─> STTService.client.streaming_recognize()
-  └─> Send back: {is_final, transcript, stability}
-```
-
-**Active Services**: STTService
-**WebSocket**: Flask-Sock integration
-
----
-
-## Service Dependency Tree
-
-```
-app.py (Main Entry)
-├── AuthService
-├── FirestoreService
-├── StorageService
-├── DocAIService [Not actively used]
-├── TTSService
-│   └── utils/text_utils.py::sanitize_text_for_tts
-├── STTService
-└── DocumentRetrievalService
-    ├── FirestoreService
-    └── StorageService
-
-DatabaseManager
-├── SqliteSaver (LangGraph checkpointing)
-├── create_quiz_engine_graph() → QuizEngineGraph
-├── create_new_chat_graph() → NewChatGraph
-└── create_supervisor_graph() → SupervisorGraph
-    ├── Compiled QuizEngineGraph instance
-    ├── Compiled NewChatGraph instance
-    └── DocumentRetrievalService
+File Upload → GCS Storage → Document AI → Firestore → TTS Pre-generation
+      ↓            ↓           ↓           ↓            ↓
+  Validation → Cloud Storage → OCR → Database → Audio Assets
 ```
 
 ---
 
-## Graph Dependency Tree
+## Feature: Answer Formulation
 
+### Frontend Flow
 ```
-SupervisorGraph
-├── receive_user_input_node [supervisor/nodes_routing.py]
-├── routing_decision_node [supervisor/nodes_routing.py]
-│   └── Uses: DocumentRetrievalService
-├── invoke_new_chat_graph_node [supervisor/nodes_invokers.py]
-│   └── Invokes: NewChatGraph
-└── invoke_quiz_engine_graph_node [supervisor/nodes_invokers.py]
-    └── Invokes: QuizEngineGraph
+AnswerFormulationPage.tsx
+├── useAnswerFormulation() (hooks/useAnswerFormulation.ts)
+│   ├── useRealtimeStt() → Dictation
+│   ├── apiService.refineAnswer() → POST /api/v2/answer-formulation/refine
+│   ├── apiService.editAnswer() → POST /api/v2/answer-formulation/edit
+│   └── useAuth() → User preferences
+├── DictationPanel.tsx
+│   ├── useOnDemandTTSPlayer()
+│   └── Real-time transcript display
+├── RefinementPanel.tsx
+│   ├── Dual TTS players (original/refined)
+│   └── Edit mode switching
+└── VoiceEditMode/ManualEditMode components
+```
 
-NewChatGraph [new_chat_graph.py]
-└── call_chat_llm_node
-    ├── DocumentRetrievalService.get_document_content()
-    ├── distill_conversation_history()
-    └── ChatGoogleGenerativeAI (gemini-2.5-flash, temp=0.7)
+### Backend Flow
+```
+/api/v2/answer-formulation/refine
+├── Session management
+├── LangGraph answer_formulation_graph
+│   ├── validate_input node
+│   ├── refine_answer node → ChatGoogleGenerativeAI
+│   ├── apply_edit node
+│   └── validate_fidelity node
+└── Response with refined_answer and audio
 
-QuizEngineGraph [quiz_engine_graph.py]
-└── call_quiz_engine_node
-    ├── DocumentRetrievalService.get_document_content_for_quiz()
-    ├── get_quiz_engine_chain() - Creates LangChain runnable
-    ├── ChatGoogleGenerativeAI (gemini-2.5-flash)
-    │   ├── temp=0.7 for question generation
-    │   └── temp=0.3 for evaluation
-    └── PydanticOutputParser (LLMQuizResponse validation)
-
-DocumentUnderstandingAgent [document_understanding_agent/graph.py]
-└── run_dua_processing_for_document() [Called from document_routes.py]
-    ├── StorageService.get_file()
-    ├── Vertex AI upload
-    ├── ChatGoogleGenerativeAI (gemini-2.5-flash-preview-05-20, temp=0.3)
-    └── Returns: tts_ready_narrative
+/api/v2/answer-formulation/edit
+├── Session retrieval
+├── Edit command processing
+└── Updated refined answer
 ```
 
 ---
 
-## Frontend Component Dependency Tree
+## Feature: Quiz System
 
+### Frontend Quiz Flow
+```
+ChatPage.tsx (Quiz Mode)
+├── Quiz state management
+├── apiService.startQuiz() → POST /api/v2/agent/chat
+├── apiService.continueQuiz() → POST /api/v2/agent/chat
+├── QuizContext.tsx
+│   ├── quizThreadId state
+│   └── cancelQuiz() → apiService.cancelQuiz()
+└── Question rendering with options
+```
+
+### Backend Quiz Flow
+```
+Quiz Engine Graph (graphs/quiz_engine_graph.py)
+├── QuizEngineState management
+├── Question generation → ChatGoogleGenerativeAI
+├── Answer evaluation
+├── Score tracking
+└── Next question logic
+```
+
+---
+
+## Feature: Text-to-Speech (TTS)
+
+### Frontend TTS Flow
+```
+AccessibilityContext.tsx
+├── speakText() → TTS orchestration
+├── Cloud TTS path
+│   ├── apiService.synthesizeText() → POST /api/tts/synthesize
+│   └── useOnDemandTTSPlayer() → Audio playback
+└── Browser TTS path
+    ├── speechSynthesis API
+    └── Voice selection
+
+useTTSPlayer.ts (Document TTS)
+├── Pre-generated assets → GET /api/documents/{id}/tts-assets
+├── On-demand synthesis fallback
+└── Word-level timepoint synchronization
+```
+
+### Backend TTS Flow
+```
+/api/tts/synthesize
+├── TTSService.synthesize_speech()
+│   ├── Text chunking (for large texts)
+│   ├── Google Cloud Text-to-Speech API
+│   └── Timepoint generation
+└── Base64 audio response
+
+/api/documents/{id}/tts-assets
+├── StorageService.get_signed_urls()
+└── Pre-generated audio and timepoints
+```
+
+---
+
+## Feature: Speech-to-Text (STT)
+
+### Frontend STT Flow
+```
+useRealtimeStt.ts
+├── WebSocket connection → ws://localhost:8000/api/stt/stream
+├── useAudioRecorder() → Microphone access
+├── Audio chunk streaming
+└── Transcript assembly (final/interim)
+
+MicrophoneButton.tsx
+├── Recording state machine
+├── Audio review interface
+└── Transcript editing
+```
+
+### Backend STT Flow
+```
+WebSocket /api/stt/stream
+├── STTService.transcribe_stream()
+│   ├── Google Cloud Speech-to-Text API
+│   └── Real-time processing
+└── Transcript streaming
+
+/api/stt/transcribe
+├── File upload processing
+├── STTService.transcribe_audio()
+└── Batch transcription
+```
+
+---
+
+## Cross-Feature Dependencies
+
+### Authentication Layer
+```
+Firebase Auth
+├── AuthContext.tsx (Frontend)
+│   ├── User session management
+│   ├── Preference synchronization
+│   └── Token refresh
+├── AuthService (Backend)
+│   ├── ID token verification
+│   └── User profile management
+└── All API endpoints → auth_required decorator
+```
+
+### Accessibility Layer
+```
+AccessibilityContext.tsx
+├── Visual preferences (font, contrast, spacing)
+├── TTS settings (voice, speed, delay)
+├── User preference persistence
+└── Global accessibility state
+├── SpeakableText.tsx → Hover TTS
+├── All components → Accessibility integration
+└── CSS classes → Dynamic styling
+```
+
+### Data Persistence Layer
+```
+Firestore Database
+├── UserService → User profiles and preferences
+├── DocumentService → Document metadata
+├── ProgressService → User progress tracking
+└── SessionService → Chat/quiz sessions
+
+Google Cloud Storage
+├── File storage (documents, audio)
+├── Signed URL generation
+└── Asset management
+```
+
+### External Service Dependencies
+```
+Google Cloud Services
+├── Firebase Authentication
+├── Firestore Database
+├── Cloud Storage
+├── Document AI (OCR)
+├── Text-to-Speech API
+└── Speech-to-Text API
+
+OpenAI/Google AI
+├── ChatGoogleGenerativeAI (gemini-2.5-flash)
+├── LLM processing for chat/quiz/answer formulation
+└── Prompt engineering and response handling
+```
+
+---
+
+## Component Dependency Matrix
+
+### High-Level Components
 ```
 App.tsx
-├── AuthProvider [contexts/AuthContext.tsx]
-│   ├── Firebase Auth
-│   └── Firestore user preferences
-├── AccessibilityProvider [contexts/AccessibilityContext.tsx]
-│   ├── Uses: AuthContext.userPreferences
-│   ├── TTSService via apiService
-│   └── Browser SpeechSynthesis
-└── Router
-    └── DashboardLayout [layouts/DashboardLayout.tsx]
-        ├── DocumentProvider [contexts/DocumentContext.tsx]
-        ├── QuizProvider [contexts/QuizContext.tsx]
-        └── Outlet (renders pages)
-
-ChatPage.tsx
-├── useAccessibility()
-├── apiService.chat()
-├── apiService.uploadAudioMessage()
-├── GeminiChatInterface
-│   ├── useChatTTSPlayer() - For agent messages
-│   ├── useOnDemandTTSPlayer() - For user messages
-│   ├── MessageBubble (multiple)
-│   └── ChatInputBar
-│       ├── useRealtimeStt() - WebSocket STT
-│       └── MicrophoneButton
-
-DocumentView.tsx
-├── useDocument() - Set active document
-├── useTTSPlayer(documentId, content)
-│   ├── apiService.getTtsAssets() - Try pre-generated
-│   └── apiService.synthesizeText() - Fallback
-├── SpeakableDocumentContent - Word highlighting
-└── axios.get(`/api/documents/${id}`)
-
-DocumentsList.tsx
-└── axios.get('/api/documents') - List documents
+├── Router setup
+├── Context providers
+│   ├── AuthProvider
+│   ├── AccessibilityProvider
+│   ├── DocumentProvider
+│   └── QuizProvider
+└── Route definitions
+    ├── Public routes (Landing, Auth)
+    └── Protected routes (Dashboard, Chat, etc.)
 ```
 
----
+### Shared Utilities
+```
+api.ts (Frontend Service Layer)
+├── Axios configuration
+├── Authentication interceptor
+├── All API method definitions
+└── Error handling
 
-## API Endpoint Usage Map
+utils/ttsUtils.ts
+├── Cloud TTS integration
+├── Audio playback utilities
+└── Voice management
+```
 
-### Active Endpoints (Used by Frontend)
+### State Management Flow
+```
+User Action → Component → Hook/Context → API Service → Backend Service → External API
+     ↓              ↓           ↓              ↓              ↓           ↓
+UI Update → State Change → Side Effect → HTTP Request → Business Logic → Data Processing
+```
 
-| Endpoint | Method | Frontend Caller | Backend Handler |
-|----------|--------|-----------------|-----------------|
-| `/api/v2/agent/chat` | POST | ChatPage (text/audio) | app.py::agent_chat_route |
-| `/api/stt/stream` | WebSocket | useRealtimeStt | app.py::stt_stream |
-| `/api/tts/synthesize` | POST | useTTSPlayer, useOnDemandTTSPlayer | app.py::tts_synthesize_route |
-| `/api/documents/upload` | POST | DocumentUpload | document_routes.py::upload_document |
-| `/api/documents` | GET | DocumentsList | document_routes.py::list_documents |
-| `/api/documents/{id}` | GET | DocumentView | document_routes.py::get_document |
-| `/api/documents/{id}` | DELETE | DocumentsList | document_routes.py::delete_document |
-| `/api/documents/{id}/download` | GET | DocumentView | document_routes.py::download_document |
-| `/api/documents/{id}/tts-assets` | GET | useTTSPlayer | document_routes.py::get_tts_assets |
-| `/api/users/me` | GET | Settings | user_routes.py::get_user_profile |
-| `/api/users/me/preferences` | PUT | AccessibilityContext | user_routes.py::update_preferences |
-| `/api/progress` | GET/POST | Dashboard | progress_routes.py |
-
-### Deprecated/Unused Endpoints
-- None identified (all registered blueprints are actively used)
-
----
-
-## Summary
-
-### Active Code Paths
-1. ✅ **Document Upload → DUA → TTS Pre-generation** (Full pipeline active)
-2. ✅ **Document View → TTS Playback** (Pre-generated or on-demand)
-3. ✅ **Chat → Supervisor → NewChatGraph** (Document Q&A)
-4. ✅ **Quiz → Supervisor → QuizEngineGraph** (Quiz generation & evaluation)
-5. ✅ **Real-time STT → WebSocket** (Voice input)
-6. ✅ **Audio Upload → STT → Chat** (Audio messages)
-
-### Inactive/Deprecated Components
-1. ❌ **OCRTool**: Referenced in document_routes.py but not initialized in app.py
-2. ❌ **AiTutorAgent**: Mentioned in comments as deprecated, not imported
-3. ❌ **AdvancedDocumentLayoutTool**: Removed/deprecated per memories
-4. ⚠️ **DocAIService**: Initialized but not actively used (DUA uses Vertex AI directly)
-
-### Critical Dependencies
-- **LangGraph**: All agent functionality (Supervisor, Chat, Quiz)
-- **Google Cloud**: TTS, STT, Vertex AI (Gemini)
-- **Firebase**: Auth, Firestore
-- **GCS**: File storage
-- **SQLite**: LangGraph state checkpointing
+This dependency graph provides a comprehensive view of how all components interact and depend on each other throughout the LexiAid application, making it easier to understand the full-stack architecture and identify potential impact areas for changes.

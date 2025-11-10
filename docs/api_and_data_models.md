@@ -1,69 +1,229 @@
 # API and Data Models Documentation
 
-## Backend API Endpoints
+## Overview
+This document provides a comprehensive overview of all API endpoints, request/response models, and data structures used throughout the LexiAid application. It serves as a reference for frontend-backend communication and data flow architecture.
 
-### Authentication
-All endpoints (except health checks) require Firebase authentication via Bearer token in Authorization header.
+## API Endpoints
 
----
+### Authentication Endpoints
 
-## Document Management API
+#### User Authentication
+- **Provider**: Firebase Authentication
+- **Base URL**: N/A (Firebase SDK)
+- **Methods**: 
+  - Email/Password Sign In
+  - Email/Password Sign Up
+  - Google OAuth Sign In
+  - Password Reset
+  - Sign Out
 
-### `POST /api/documents/upload`
-**Purpose**: Upload and process a new document
+#### User Profile Management
+```typescript
+GET /api/users/profile
+Authorization: Bearer <firebase_id_token>
 
-**Request**:
-- **Content-Type**: multipart/form-data
-- **Fields**:
-  - `file`: File (required) - Document file
-  - `name`: string (optional) - Custom document name
-
-**Response** (200 OK):
-```json
+Response:
 {
-  "id": "uuid-string",
-  "name": "Document Name",
-  "original_filename": "file.pdf",
-  "file_type": "pdf",
-  "status": "processed_dua" | "processed_ocr" | "dua_failed" | "ocr_unavailable",
-  "created_at": "ISO-8601 timestamp",
-  "updated_at": "ISO-8601 timestamp",
-  "gcs_uri": "gs://bucket/path/to/file",
-  "dua_narrative_content": "TTS-ready narrative text" | null,
-  "ocr_text_content": "OCR extracted text" | null,
-  "tts_audio_gcs_uri": "gs://bucket/path/to/audio.mp3" | null,
-  "tts_timepoints_gcs_uri": "gs://bucket/path/to/timepoints.json" | null,
-  "processing_error": "Error message" | null
+  "data": {
+    "displayName": string,
+    "email": string,
+    "uid": string,
+    "preferences": UserPreferences
+  }
+}
+
+PATCH /api/users/profile
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+
+Request:
+{
+  "displayName"?: string,
+  "preferences"?: UserPreferences
 }
 ```
 
-**Processing Flow**:
-1. Upload → `status: "uploading"`
-2. DUA Processing → `status: "processing_dua"`
-3. Success → `status: "processed_dua"` + TTS pre-generation
-4. Failure → `status: "dua_failed"` → OCR fallback (deprecated) → `status: "ocr_unavailable"`
-
 ---
 
-### `GET /api/documents`
-**Purpose**: List user's documents
+### Document Management Endpoints
 
-**Query Parameters**:
-- `folder_id`: string (optional) - Filter by folder
+#### Document Upload
+```typescript
+POST /api/documents
+Authorization: Bearer <firebase_id_token>
+Content-Type: multipart/form-data
 
-**Response** (200 OK):
-```json
+Request:
+- file: File (PDF, PNG, JPG, JPEG, TXT, DOC, DOCX)
+- metadata: string (JSON string)
+
+Response:
+{
+  "id": string,
+  "name": string,
+  "created_at": string,
+  "updated_at": string,
+  "file_type": string,
+  "original_filename": string,
+  "content_length": number
+}
+```
+
+#### Document Retrieval
+```typescript
+GET /api/documents
+Authorization: Bearer <firebase_id_token>
+
+Response:
 {
   "data": [
     {
-      "id": "uuid",
-      "name": "Document Name",
-      "original_filename": "file.pdf",
-      "file_type": "pdf",
-      "status": "processed_dua",
-      "created_at": "ISO-8601",
-      "updated_at": "ISO-8601",
-      "content_length": 12345
+      "id": string,
+      "name": string,
+      "created_at": string,
+      "updated_at": string,
+      "file_type": string,
+      "original_filename": string,
+      "content_length": number,
+      "processing_status": string,
+      "page_count": number
+    }
+  ]
+}
+
+GET /api/documents/{document_id}?include_content=true
+Authorization: Bearer <firebase_id_token>
+
+Response:
+{
+  "id": string,
+  "name": string,
+  "content": string,
+  "full_content"?: string,
+  "chunks"?: string[],
+  "created_at": string,
+  "updated_at": string,
+  "user_id": string,
+  "file_type": string,
+  "original_filename": string,
+  "content_length": number
+}
+```
+
+#### Document Operations
+```typescript
+DELETE /api/documents/{document_id}
+Authorization: Bearer <firebase_id_token>
+
+Response: 204 No Content
+
+GET /api/documents/{document_id}/download
+Authorization: Bearer <firebase_id_token>
+
+Response: File download
+
+GET /api/documents/{document_id}/tts-assets
+Authorization: Bearer <firebase_id_token>
+
+Response:
+{
+  "audio_url": string,
+  "timepoints_url": string
+}
+```
+
+---
+
+### Chat and AI Endpoints
+
+#### Main Chat Interface
+```typescript
+POST /api/v2/agent/chat
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+
+Request:
+{
+  "query": string,
+  "documentId"?: string,
+  "thread_id"?: string
+}
+
+Response:
+{
+  "final_agent_response": string,
+  "response": string,
+  "thread_id": string,
+  "active_quiz_thread_id"?: string,
+  "audio_content_base64"?: string,
+  "timepoints"?: Timepoint[],
+  "quiz_active": boolean,
+  "quiz_complete": boolean,
+  "quiz_cancelled": boolean,
+  "conversation_history"?: any[],
+  "document_id"?: string,
+  "processing_mode"?: string,
+  "error_detail"?: string
+}
+```
+
+#### Audio Message Processing
+```typescript
+POST /api/v2/agent/chat
+Authorization: Bearer <firebase_id_token>
+Content-Type: multipart/form-data
+
+Request:
+- audio: File (WebM, MP3, FLAC, OGG)
+- query?: string
+- documentId?: string
+- thread_id?: string
+- stt_processing_mode?: "review" | "direct_send"
+
+Response:
+{
+  "response"?: string,
+  "thread_id"?: string,
+  "quiz_active"?: boolean,
+  "error"?: string,
+  "transcript"?: string, // For review mode
+  "processing_mode"?: string,
+  "text"?: string,
+  "final_agent_response"?: string
+}
+```
+
+---
+
+### Text-to-Speech Endpoints
+
+#### Speech Synthesis
+```typescript
+POST /api/tts/synthesize
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+
+Request:
+{
+  "text": string
+}
+
+Response:
+{
+  "audio_content": string, // Base64 encoded
+  "timepoints": Timepoint[]
+}
+
+GET /api/tts/voices
+Authorization: Bearer <firebase_id_token>
+
+Response:
+{
+  "voices": [
+    {
+      "name": string,
+      "language_codes": string[],
+      "ssml_gender": string
     }
   ]
 }
@@ -71,590 +231,468 @@ All endpoints (except health checks) require Firebase authentication via Bearer 
 
 ---
 
-### `GET /api/documents/{document_id}`
-**Purpose**: Get document metadata and optionally content
+### Speech-to-Text Endpoints
 
-**Query Parameters**:
-- `include_content`: boolean (default: false) - Include document content
+#### Audio Transcription
+```typescript
+POST /api/stt/transcribe
+Authorization: Bearer <firebase_id_token>
+Content-Type: multipart/form-data
 
-**Response** (200 OK):
-```json
+Request:
+- audio: File
+- language_code?: string (default: "en-US")
+
+Response:
 {
-  "id": "uuid",
-  "name": "Document Name",
-  "original_filename": "file.pdf",
-  "file_type": "pdf",
-  "status": "processed_dua",
-  "created_at": "ISO-8601",
-  "updated_at": "ISO-8601",
-  "user_id": "firebase-uid",
-  "gcs_uri": "gs://bucket/path",
-  "content": "Full document text" // if include_content=true
+  "transcript": string,
+  "confidence": number,
+  "language_code": string
 }
-```
 
----
+GET /api/stt/languages
+Authorization: Bearer <firebase_id_token>
 
-### `GET /api/documents/{document_id}/download`
-**Purpose**: Download original document file
-
-**Response** (200 OK):
-- **Content-Type**: Original file MIME type
-- **Body**: File binary data
-- **Headers**: `Content-Disposition: attachment; filename="original.pdf"`
-
----
-
-### `GET /api/documents/{document_id}/tts-assets`
-**Purpose**: Get pre-generated TTS assets (audio + timepoints)
-
-**Response** (200 OK):
-```json
+Response:
 {
-  "audio_url": "https://storage.googleapis.com/signed-url-to-audio.mp3",
-  "timepoints_url": "https://storage.googleapis.com/signed-url-to-timepoints.json"
-}
-```
-
-**Timepoints JSON Structure**:
-```json
-[
-  { "mark_name": "Hello", "time_seconds": 0.0 },
-  { "mark_name": "world", "time_seconds": 0.5 },
-  { "mark_name": "PARAGRAPH_BREAK", "time_seconds": 1.2 },
-  { "mark_name": "Next", "time_seconds": 1.9 }
-]
-```
-
----
-
-### `DELETE /api/documents/{document_id}`
-**Purpose**: Delete document and associated files
-
-**Response** (200 OK):
-```json
-{
-  "message": "Document deleted successfully",
-  "deleted_files": ["gs://bucket/original.pdf", "gs://bucket/audio.mp3"]
-}
-```
-
----
-
-## Agent Chat API
-
-### `POST /api/v2/agent/chat`
-**Purpose**: Main agent interaction endpoint (text, audio, quiz)
-
-**Request (Text)**:
-- **Content-Type**: application/json
-```json
-{
-  "query": "User's question or command",
-  "documentId": "uuid" | null,
-  "thread_id": "thread-uuid" | null
-}
-```
-
-**Request (Audio)**:
-- **Content-Type**: multipart/form-data
-- **Fields**:
-  - `audio_file`: File (webm/opus, flac, mp3, wav)
-  - `document_id`: string (optional)
-  - `thread_id`: string (optional)
-  - `transcript`: string (optional) - Client-provided transcript
-  - `stt_processing_mode`: "review" | "direct_send" (optional)
-
-**Response** (200 OK):
-```json
-{
-  "response": "Agent's text response",
-  "final_agent_response": "Structured agent output (quiz questions, etc.)",
-  "thread_id": "thread-uuid",
-  "active_quiz_thread_id": "quiz-thread-uuid" | null,
-  "conversation_history": [
-    { "role": "user", "content": "..." },
-    { "role": "assistant", "content": "..." }
-  ],
-  "quiz_active": false,
-  "quiz_complete": false,
-  "quiz_cancelled": false,
-  "document_id": "uuid" | null,
-  "processing_mode": "review" | "direct_send" | null,
-  "audio_content_base64": "base64-encoded-mp3" | null,
-  "timepoints": [ /* array of timepoint objects */ ] | null,
-  "transcript": "Transcribed text from audio" | null
-}
-```
-
-**Special Commands**:
-- `/start_quiz` - Initiate quiz for document
-- `/cancel_quiz` - Cancel active quiz
-
----
-
-## TTS API
-
-### `POST /api/tts/synthesize`
-**Purpose**: On-demand text-to-speech synthesis
-
-**Request**:
-```json
-{
-  "text": "Text to synthesize",
-  "voice_name": "en-US-Standard-C" | null,
-  "speaking_rate": 1.0 | null,
-  "pitch": 0.0 | null
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "audio_content": "base64-encoded-mp3-audio",
-  "timepoints": [
-    { "mark_name": "word", "time_seconds": 0.0 },
-    { "mark_name": "PARAGRAPH_BREAK", "time_seconds": 1.5 }
-  ]
-}
-```
-
----
-
-## STT API
-
-### `WebSocket /api/stt/stream`
-**Purpose**: Real-time speech-to-text streaming
-
-**Connection**: WebSocket upgrade
-
-**Send** (Binary): Audio chunks (webm/opus, 16kHz, mono)
-
-**Receive** (JSON):
-```json
-{
-  "is_final": false,
-  "transcript": "partial transcript",
-  "stability": 0.85
-}
-```
-
-**Final Result**:
-```json
-{
-  "is_final": true,
-  "transcript": "complete final transcript",
-  "stability": 1.0
-}
-```
-
----
-
-### `POST /api/stt/transcribe`
-**Purpose**: File-based speech-to-text
-
-**Request**:
-- **Content-Type**: multipart/form-data
-- **Fields**:
-  - `audio_file`: File (mp3, wav, flac, webm)
-
-**Response** (200 OK):
-```json
-{
-  "transcript": "Transcribed text",
-  "confidence": 0.95,
-  "language_code": "en-US"
-}
-```
-
----
-
-## User API
-
-### `GET /api/users/me`
-**Purpose**: Get current user profile
-
-**Response** (200 OK):
-```json
-{
-  "uid": "firebase-uid",
-  "email": "user@example.com",
-  "displayName": "User Name",
-  "preferences": {
-    "fontSize": 16,
-    "fontFamily": "OpenDyslexic",
-    "lineSpacing": 1.5,
-    "wordSpacing": 0.1,
-    "highContrast": false,
-    "uiTtsEnabled": true,
-    "cloudTtsEnabled": true,
-    "ttsVoice": "en-US-Standard-C",
-    "ttsSpeed": 1.0,
-    "ttsPitch": 0.0,
-    "ttsDelay": 500
-  },
-  "gamification": {
-    "points": 100,
-    "level": 2,
-    "streak": 5,
-    "badges": ["first_quiz", "week_streak"]
-  }
-}
-```
-
----
-
-### `PUT /api/users/me/preferences`
-**Purpose**: Update user preferences
-
-**Request**:
-```json
-{
-  "fontSize": 18,
-  "highContrast": true,
-  "uiTtsEnabled": false
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "message": "Preferences updated successfully"
-}
-```
-
----
-
-## Progress API
-
-### `GET /api/progress`
-**Purpose**: Get user's learning progress
-
-**Query Parameters**:
-- `days`: number (default: 7) - Number of days to retrieve
-
-**Response** (200 OK):
-```json
-{
-  "data": [
+  "languages": [
     {
-      "date": "2024-01-15",
-      "documentsRead": 3,
-      "questionsAnswered": 15,
-      "timeSpent": 3600,
-      "quizzesCompleted": 2,
-      "averageScore": 0.85
+      "code": string,
+      "name": string
     }
   ]
 }
 ```
 
----
-
-### `POST /api/progress`
-**Purpose**: Create progress entry
-
-**Request**:
-```json
-{
-  "date": "2024-01-15",
-  "documentsRead": 1,
-  "questionsAnswered": 5,
-  "timeSpent": 1200
-}
-```
-
-**Response** (201 Created):
-```json
-{
-  "id": "progress-uuid",
-  "message": "Progress entry created"
-}
-```
-
----
-
-## Firestore Data Models
-
-### Collection: `users`
-**Document ID**: Firebase UID
-
+#### Real-time Streaming
 ```typescript
+WebSocket: ws://localhost:8000/api/stt/stream
+Protocol: WebSocket
+Authentication: Query parameter or subprotocol
+
+Messages:
+Client -> Server: Audio chunks (binary)
+Server -> Client: 
 {
-  uid: string
-  email: string
-  displayName: string
-  createdAt: Timestamp
-  lastLogin: Timestamp
-  preferences: {
-    fontSize: number
-    fontFamily: string
-    lineSpacing: number
-    wordSpacing: number
-    textColor: string
-    backgroundColor: string
-    highContrast: boolean
-    uiTtsEnabled: boolean
-    cloudTtsEnabled: boolean
-    ttsVoice: string
-    ttsSpeed: number
-    ttsPitch: number
-    ttsDelay: number
-  }
-  gamification: {
-    points: number
-    level: number
-    streak: number
-    badges: string[]
-  }
+  "transcript": string,
+  "is_final": boolean
 }
 ```
 
 ---
 
-### Collection: `documents`
-**Document ID**: Auto-generated UUID
+### Answer Formulation Endpoints
 
+#### Transcript Refinement
 ```typescript
+POST /api/v2/answer-formulation/refine
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+
+Request:
 {
-  id: string
-  user_id: string  // Firebase UID
-  name: string
-  original_filename: string
-  file_type: string  // pdf, png, jpg, txt, etc.
-  status: "uploading" | "uploaded" | "processing_dua" | "processed_dua" | 
-          "dua_failed" | "processing_ocr" | "processed_ocr" | "ocr_unavailable"
-  created_at: Timestamp
-  updated_at: Timestamp
-  gcs_uri: string  // gs://bucket/path/to/original
-  content_length: number
-  mime_type: string
+  "transcript": string,
+  "question"?: string,
+  "session_id"?: string
+}
+
+Response:
+{
+  "refined_answer": string,
+  "session_id": string,
+  "status": string,
+  "fidelity_score"?: number,
+  "iteration_count": number,
+  "audio_content_base64"?: string,
+  "timepoints"?: Timepoint[]
+}
+```
+
+#### Answer Editing
+```typescript
+POST /api/v2/answer-formulation/edit
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+
+Request:
+{
+  "session_id": string,
+  "edit_command": string
+}
+
+Response:
+{
+  "refined_answer": string,
+  "session_id": string,
+  "status": string,
+  "iteration_count": number,
+  "audio_content_base64"?: string,
+  "timepoints"?: Timepoint[]
+}
+```
+
+---
+
+### Progress Endpoints
+
+#### User Progress
+```typescript
+GET /api/progress/
+Authorization: Bearer <firebase_id_token>
+
+Response: // Currently placeholder
+{
+  "message": "Progress endpoint placeholder"
+}
+```
+
+---
+
+## Data Models
+
+### Core Data Types
+
+#### Timepoint
+```typescript
+interface Timepoint {
+  mark_name: string;
+  time_seconds: number;
+}
+```
+
+#### Chat Message
+```typescript
+interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'agent';
+  timestamp: string;
+  isQuizQuestion?: boolean;
+  options?: string[];
+  document_id?: string;
+  thread_id?: string;
+  audio_content_base64?: string | null;
+  timepoints?: Timepoint[] | null;
+}
+```
+
+#### Document
+```typescript
+interface Document {
+  id: string;
+  name: string;
+  content?: string;
+  full_content?: string;
+  chunks?: string[];
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  file_type: string;
+  original_filename: string;
+  content_length: number;
+  processing_status?: string;
+  page_count?: number;
+}
+```
+
+---
+
+### User Models
+
+#### User Preferences
+```typescript
+interface UserPreferences {
+  // Visual Accessibility
+  fontSize: number;
+  fontFamily: string;
+  lineSpacing: number;
+  wordSpacing: number;
+  textColor: string;
+  backgroundColor: string;
+  highContrast: boolean;
   
-  // DUA Processing Results
-  dua_narrative_content: string | null  // TTS-ready narrative
-  tts_audio_gcs_uri: string | null      // Pre-generated audio
-  tts_timepoints_gcs_uri: string | null // Pre-generated timepoints
+  // TTS Settings
+  uiTtsEnabled: boolean;
+  ttsVoice: string;
+  ttsSpeed: number;
+  ttsPitch: number;
+  cloudTtsEnabled: boolean;
+  cloudTtsVoice: string;
+  ttsDelay?: number; // milliseconds
   
-  // OCR Results (Deprecated)
-  ocr_text_content: string | null
+  // Answer Formulation
+  answerFormulationAutoPause?: boolean;
+  answerFormulationPauseDuration?: number; // seconds
+  answerFormulationSessionsCompleted?: number;
+  answerFormulationAutoPauseSuggestionDismissed?: boolean;
+  answerFormulationOnboardingCompleted?: boolean;
   
-  // Error Tracking
-  processing_error: string | null
-  
-  // Organization
-  folder_id: string | null
-  tags: string[]
+  // Auth Helper
+  getAuthToken?: (forceRefresh?: boolean) => Promise<string>;
 }
 ```
 
----
-
-### Subcollection: `documents/{doc_id}/document_contents`
-**Document ID**: Auto-generated
-
+#### User Profile
 ```typescript
-{
-  document_id: string
-  content: string  // Full text content
-  source: "firestore_dua_narrative" | "firestore_ocr_field" | "gcs"
-  created_at: Timestamp
+interface UserProfile {
+  displayName: string;
+  email: string;
+  uid: string;
+  preferences?: UserPreferences;
 }
 ```
 
 ---
 
-### Collection: `folders`
-**Document ID**: Auto-generated UUID
+### Answer Formulation Models
 
+#### Refine Answer Request
 ```typescript
-{
-  id: string
-  user_id: string
-  name: string
-  created_at: Timestamp
-  parent_folder_id: string | null
+interface RefineAnswerRequest {
+  transcript: string;
+  question?: string;
+  session_id?: string;
 }
 ```
 
----
-
-### Collection: `tags`
-**Document ID**: Auto-generated UUID
-
+#### Refine Answer Response
 ```typescript
-{
-  id: string
-  user_id: string
-  name: string
-  color: string
-  created_at: Timestamp
+interface RefineAnswerResponse {
+  refined_answer: string;
+  session_id: string;
+  status: string;
+  fidelity_score?: number | null;
+  iteration_count: number;
+  audio_content_base64?: string | null;
+  timepoints?: Timepoint[] | null;
 }
 ```
 
----
-
-### Collection: `interactions`
-**Document ID**: Auto-generated UUID
-
+#### Edit Answer Request
 ```typescript
-{
-  id: string
-  user_id: string
-  document_id: string
-  interaction_type: "view" | "chat" | "quiz" | "tts_playback"
-  timestamp: Timestamp
-  metadata: {
-    quiz_score?: number
-    questions_answered?: number
-    time_spent?: number
-  }
+interface EditAnswerRequest {
+  session_id: string;
+  edit_command: string;
 }
 ```
 
----
-
-### Collection: `progress`
-**Document ID**: Auto-generated UUID
-
+#### Edit Answer Response
 ```typescript
-{
-  id: string
-  user_id: string
-  date: string  // YYYY-MM-DD
-  documentsRead: number
-  questionsAnswered: number
-  timeSpent: number  // seconds
-  quizzesCompleted: number
-  averageScore: number  // 0.0 - 1.0
+interface EditAnswerResponse {
+  refined_answer: string;
+  session_id: string;
+  status: string;
+  iteration_count: number;
+  audio_content_base64?: string | null;
+  timepoints?: Timepoint[] | null;
 }
 ```
 
 ---
 
-## LangGraph State Models
+### Audio Processing Models
 
-### SupervisorState
+#### Audio Upload Response
 ```typescript
-{
-  user_id: string
-  current_query: string
-  conversation_history: BaseMessage[]
-  active_chat_thread_id: string | null
-  active_dua_thread_id: string | null
-  document_id_for_action: string | null
-  document_snippet_for_quiz: string | null
-  next_graph_to_invoke: "quiz_engine_graph" | "new_chat_graph" | "end" | null
-  final_agent_response: string | null
-  supervisor_error_message: string | null
-  active_quiz_v2_thread_id: string | null
-  quiz_engine_state: QuizEngineState | null
-  is_quiz_v2_active: boolean
-  current_audio_input_base64: string | null
-  current_audio_format: string | null
+interface AudioUploadResponse {
+  response?: string;
+  thread_id?: string;
+  quiz_active?: boolean;
+  error?: string;
+  transcript?: string; // For review mode
+  processing_mode?: string;
+  text?: string;
 }
 ```
 
----
-
-### QuizEngineState
+#### TTS Synthesis Response
 ```typescript
-{
-  document_id: string
-  document_content_snippet: string
-  user_id: string
-  max_questions: number
-  user_answer: string | null
-  active_quiz_thread_id: string
-  quiz_history: Array<{
-    question_text: string
-    options: string[]
-    correct_answer_index: number
-    correct_answer_text: string
-    explanation_for_correct_answer: string | null
-    user_answer: string | null
-    is_correct_from_llm: boolean | null
-    feedback_from_llm: string | null
-  }>
-  current_question_index: number
-  current_question_number: number | null
-  score: number
-  llm_json_response: object | null
-  llm_call_count: number
-  current_question_to_display: {
-    question_text: string
-    options: string[]
-  } | null
-  current_feedback_to_display: string | null
-  status: "initializing" | "generating_first_question" | "awaiting_answer" | 
-          "evaluating_answer" | "quiz_completed" | "error"
-  error_message: string | null
+interface TTSSynthesisResponse {
+  audioContent: string; // Base64 encoded
+  timepoints: Timepoint[];
 }
 ```
 
----
-
-### GeneralQueryState (NewChatGraph)
+#### STT Transcription Response
 ```typescript
-{
-  document_id: string | null
-  user_id: string | null
-  thread_id: string | null
-  messages: BaseMessage[]
-  query: string
-  response: string | null
-  error_message: string | null
+interface STTTranscriptionResponse {
+  transcript: string;
+  confidence: number;
+  language_code: string;
 }
 ```
 
 ---
 
-## Error Response Format
+### Quiz Models
 
-All API errors follow this structure:
-
-```json
-{
-  "error": "Human-readable error message",
-  "error_code": "ERROR_CODE_IDENTIFIER",
-  "details": "Additional error details",
-  "timestamp": "ISO-8601 timestamp"
+#### Quiz Session
+```typescript
+interface QuizSession {
+  thread_id: string;
+  document_id: string;
+  questions: QuizQuestion[];
+  current_question_index: number;
+  score: number;
+  completed: boolean;
 }
 ```
 
-**Common Error Codes**:
-- `UNAUTHENTICATED` (401)
-- `INVALID_TOKEN` (401)
-- `FORBIDDEN` (403)
-- `NOT_FOUND` (404)
-- `VALIDATION_ERROR` (400)
-- `INTERNAL_SERVER_ERROR` (500)
-- `SERVICE_UNAVAILABLE` (503)
+#### Quiz Question
+```typescript
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correct_answer: number;
+  explanation?: string;
+}
+```
 
 ---
 
-## Summary
+## WebSocket Events
 
-### Total Endpoints: 15
-- **Documents**: 6 endpoints
-- **Agent Chat**: 1 endpoint (handles text, audio, quiz)
-- **TTS**: 1 endpoint
-- **STT**: 2 endpoints (WebSocket + file upload)
-- **User**: 2 endpoints
-- **Progress**: 2 endpoints
-- **Health**: 1 endpoint
+### Speech-to-Text Streaming
 
-### Total Firestore Collections: 6
-- users, documents, folders, tags, interactions, progress
+#### Connection Events
+```typescript
+// Client connects
+ws://localhost:8000/api/stt/stream
 
-### Total LangGraph States: 3
-- SupervisorState, QuizEngineState, GeneralQueryState
+// Server sends ready state
+{
+  "type": "ready"
+}
+```
+
+#### Audio Streaming
+```typescript
+// Client sends audio chunk
+Binary: Audio data (WebM/Opus)
+
+// Server sends transcription
+{
+  "transcript": string,
+  "is_final": boolean
+}
+```
+
+#### Error Events
+```typescript
+// Server sends error
+{
+  "type": "error",
+  "message": string
+}
+```
+
+---
+
+## Error Handling
+
+### Standard Error Response
+```typescript
+interface ErrorResponse {
+  error: string;
+  error_detail?: string;
+  status_code: number;
+}
+```
+
+### Common HTTP Status Codes
+- `200` - Success
+- `201` - Created
+- `204` - No Content
+- `400` - Bad Request
+- `401` - Unauthorized
+- `403` - Forbidden
+- `404` - Not Found
+- `422` - Validation Error
+- `500` - Internal Server Error
+
+### Authentication Errors
+```typescript
+interface AuthError {
+  error: "Authentication required",
+  message: "Valid Firebase ID token required"
+}
+```
+
+### Validation Errors
+```typescript
+interface ValidationError {
+  error: "Validation failed",
+  details: {
+    field: string,
+    message: string
+  }[]
+}
+```
+
+---
+
+## Rate Limiting and Quotas
+
+### API Rate Limits
+- **Chat API**: 100 requests per minute per user
+- **TTS API**: 50 requests per minute per user
+- **STT API**: 30 requests per minute per user
+- **Document Upload**: 10 uploads per hour per user
+
+### File Size Limits
+- **Document Upload**: 15MB maximum
+- **Audio Upload**: 25MB maximum
+- **Supported Formats**: PDF, PNG, JPG, JPEG, TXT, DOC, DOCX, WebM, MP3, FLAC, OGG
+
+### Storage Quotas
+- **Documents**: 100MB per user
+- **Audio Files**: 50MB per user
+- **TTS Cache**: 25MB per user
+
+---
+
+## API Versioning
+
+### Current Version
+- **Version**: v2
+- **Base URL**: `/api/v2`
+- **Deprecated**: v1 endpoints (still supported for backward compatibility)
+
+### Versioning Strategy
+- **URL Versioning**: `/api/v1/`, `/api/v2/`
+- **Backward Compatibility**: Previous versions supported for 6 months
+- **Breaking Changes**: Increment major version
+- **Feature Additions**: Increment minor version
+
+### Endpoint Migration
+```typescript
+// Old v1 endpoint (deprecated)
+POST /api/agent/chat
+
+// New v2 endpoint (current)
+POST /api/v2/agent/chat
+```
+
+---
+
+## Security Considerations
 
 ### Authentication
-- All endpoints require Firebase ID token (except health checks)
-- Token passed via `Authorization: Bearer {token}` header
-- Verified using Firebase Admin SDK
+- **Firebase ID Tokens**: Required for all protected endpoints
+- **Token Validation**: Server-side verification for each request
+- **Token Refresh**: Automatic token refresh for long sessions
 
-### Data Flow
-1. **Frontend** → API Service → **Backend** → Services → **Firestore/GCS**
-2. **Frontend** → API Service → **Backend** → LangGraph → **Gemini AI** → Response
-3. **Frontend** → WebSocket → **Backend** → **Google STT** → Real-time transcript
+### Authorization
+- **User Isolation**: Users can only access their own data
+- **Document Ownership**: Verified before document access
+- **Session Management**: Thread-based session isolation
+
+### Data Protection
+- **HTTPS Required**: All API calls must use HTTPS
+- **Input Validation**: Server-side validation for all inputs
+- **Output Sanitization**: Sanitized responses to prevent XSS
+
+---
+
+This API documentation provides a comprehensive reference for all LexiAid backend endpoints and data models. It should be used as the primary source of truth for frontend-backend integration and API contract definitions.

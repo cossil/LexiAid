@@ -1,322 +1,297 @@
 # Backend Services Analysis
 
 ## Overview
-Backend services provide core functionality for authentication, database operations, storage, document processing, and AI capabilities (TTS/STT).
+The backend services layer provides a comprehensive set of singleton services that handle all external integrations and data operations for the LexiAid application. Each service follows a consistent pattern with singleton instantiation, error handling, and environment-based configuration.
 
-## File: `backend/services/auth_service.py`
+## Service Files
 
-### Purpose
-Firebase Authentication verification and user management.
+### 1. __init__.py
 
-### Key Functions
+**Purpose**: Package initialization file that exports all service classes for centralized imports.
 
-#### `verify_id_token(id_token: str) -> Tuple[bool, Optional[Dict]]`
-- **Purpose**: Verify Firebase ID token and extract user info
-- **Clock Skew**: Allows 60 seconds tolerance for time differences
-- **Returns**: `(success, user_data)` tuple
-- **User Data Fields**: uid, email, emailVerified, name, pictureUrl
-- **Error Handling**: InvalidIdTokenError, ExpiredIdTokenError, RevokedIdTokenError
+**Key Functions/Components**:
+- Imports all service classes: AuthService, FirestoreService, StorageService, DocAIService, DocumentRetrievalService, TTSService, STTService
+- Defines `__all__` list for explicit exports
 
-#### `get_user(user_id: str) -> Optional[Dict]`
-- **Purpose**: Retrieve user by UID from Firebase Auth
-- **Returns**: User metadata including creation/last sign-in times
-
-#### `create_user(email, password, display_name) -> Tuple[bool, Optional[str]]`
-- **Purpose**: Create new Firebase Auth user
-- **Returns**: `(success, user_id)` tuple
-
-### Pattern
-Singleton pattern ensures single Auth connection.
+**Inputs**: None
+**Outputs/Side Effects**: Makes all service classes available when importing from the services package
 
 ---
 
-## File: `backend/services/firestore_service.py`
+### 2. auth_service.py
 
-### Purpose
-Firestore database operations for users, documents, folders, tags, interactions, and progress.
+**Purpose**: Handles Firebase Authentication operations including token verification, user management, and authentication-related utilities.
 
-### Key Functions
+**Key Functions/Components**:
+- **verify_id_token()**: Verifies Firebase ID tokens with clock skew tolerance and revocation checking
+- **get_user()**: Retrieves user data from Firebase Auth by UID
+- **create_user()**: Creates new Firebase Auth users with optional display names
+- **update_user()**: Updates existing user properties in Firebase Auth
+- **delete_user()**: Deletes users from Firebase Auth
+- **generate_email_verification_link()**: Creates email verification links
+- **generate_password_reset_link()**: Creates password reset links
 
-#### User Operations
-- `get_user(user_id)`: Retrieve user document
-- `create_user(user_id, user_data)`: Create user with default preferences
-  - Default preferences: fontSize=16, fontFamily='OpenDyslexic', lineSpacing=1.5
-  - Default gamification: points=0, streak=0, level=1
-- `update_user_preferences(user_id, preferences)`: Update user settings
+**Inputs**:
+- Firebase ID tokens for verification
+- User data dictionaries for creation/updates
+- User IDs for user-specific operations
 
-#### Document Operations
-- `save_document(document_data)`: Save document metadata
-  - Auto-adds timestamps (created_at, updated_at)
-  - Sets initial processing_status='completed'
-- `get_document(document_id)`: Retrieve document by ID
-- `update_document(document_id, document_data)`: Update document fields
-- `delete_document_by_id(document_id, user_id)`: Delete with ownership verification
-  - Returns GCS URI for cleanup
-- `get_user_documents(user_id, folder_id)`: List user's documents
-  - Handles both 'userId' and 'user_id' field names for backward compatibility
+**Outputs/Side Effects**:
+- Returns user data dictionaries or error states
+- Modifies Firebase Auth user records
+- Generates authentication links for email workflows
 
-#### Content Storage
-- `save_document_content(content_data)`: Store in 'document_contents' collection
-- `get_document_content_from_subcollection(document_id)`: Retrieve from subcollection
-
-#### Other Collections
-- **Folders**: create_folder, get_user_folders
-- **Tags**: create_tag, get_user_tags
-- **Interactions**: create_interaction, get_user_interactions
-- **Progress**: create_progress_entry, get_user_progress
-- **Gamification**: update_user_gamification, add_badge_to_user
-
-### Database Configuration
-- **Project ID**: From GCP_PROJECT_ID env var
-- **Database Name**: Overrides '(default)' to 'ai-tutor-dev-457802'
-- **Client**: Uses google.cloud.firestore.Client with explicit database parameter
-
-### Pattern
-Singleton pattern with cleanup of existing Firebase apps on initialization.
+**Dependencies**: Firebase Admin SDK, environment variables for service account credentials
 
 ---
 
-## File: `backend/services/storage_service.py`
+### 3. firestore_service.py
 
-### Purpose
-Google Cloud Storage operations for file management.
+**Purpose**: Comprehensive Firestore database service managing all data persistence operations including users, documents, folders, tags, interactions, progress tracking, and gamification.
 
-### Key Functions
+**Key Functions/Components**:
 
-#### File Upload
-- `upload_file(file_content, content_type, user_id, original_filename)`
-  - Generates unique UUID-based filename
-  - Organizes files under user_id folder
-  - Returns: `(success, file_metadata)` with gcsUri, contentType, size
-  
-- `upload_string_as_file(content_string, content_type, user_id, base_filename, sub_folder)`
-  - Uploads text/JSON content as file
-  - Supports optional sub_folder (e.g., 'structured_outputs', 'tts_outputs')
-  
-- `upload_bytes_as_file(content_bytes, content_type, user_id, base_filename, sub_folder)`
-  - Uploads binary content (e.g., audio files)
+#### User Management
+- **get_user()**: Retrieves user profile data
+- **create_user()**: Creates new user records with default preferences and gamification
+- **update_user()**: Updates user profile information
+- **update_user_preferences()**: Manages accessibility and UI preferences
 
-#### File Retrieval
-- `get_file(file_path)`: Download file as bytes
-  - Handles full GCS URIs (strips `gs://{bucket_name}/` prefix)
-  
-- `download_file_as_string(gcs_uri)`: Download and return as string
+#### Document Management
+- **save_document()**: Stores document metadata with timestamps and processing status
+- **save_document_content()**: Stores document content in separate collection to avoid size limits
+- **get_document()**: Retrieves document metadata
+- **get_document_content_from_subcollection()**: Gets content from document_contents collection
+- **update_document()**: Updates document metadata
+- **delete_document_by_id()**: Securely deletes documents with ownership verification
+- **get_user_documents()**: Lists user documents with optional folder filtering
 
-#### File Management
-- `delete_file(file_path)`: Delete blob
-- `delete_file_from_gcs(gcs_uri)`: Delete by full URI
-- `copy_file(source_path, destination_path)`: Copy within GCS
-- `list_user_files(user_id, prefix)`: List files with optional prefix filter
+#### Organization Features
+- **create_folder()**: Creates folder structures for document organization
+- **get_user_folders()**: Retrieves user folder hierarchies
+- **create_tag()**: Creates document tags
+- **get_user_tags()**: Retrieves user's tag collection
 
-#### URL Generation
-- `get_signed_url(file_path, expiration_minutes=15)`: Temporary access URL
-- `get_public_url(file_path)`: Public URL (requires public blob)
+#### Activity Tracking
+- **create_interaction()**: Records user-document interactions
+- **get_user_interactions()**: Retrieves interaction history
+- **create_progress_entry()**: Creates progress tracking records
+- **get_user_progress()**: Gets progress data over time periods
 
-### Configuration
-- **Bucket**: From GCS_BUCKET_NAME env var
-- **Client**: google.cloud.storage.Client
+#### Gamification
+- **update_user_gamification()**: Updates points, streaks, levels, badges
+- **add_badge_to_user()**: Awards badges to user profiles
 
-### Pattern
-Singleton pattern ensures single Storage connection.
+**Inputs**:
+- User IDs, document IDs, and various data dictionaries
+- Query parameters for filtering and pagination
+
+**Outputs/Side Effects**:
+- Returns structured data or error states
+- Modifies Firestore collections and documents
+- Handles database constraints and validation
+
+**Dependencies**: Google Cloud Firestore, Firebase Admin SDK, environment configuration
 
 ---
 
-## File: `backend/services/doc_ai_service.py`
+### 4. storage_service.py
 
-### Purpose
-Google Document AI integration for OCR and document processing.
+**Purpose**: Manages Google Cloud Storage operations for file uploads, downloads, and organization with user-specific paths and metadata handling.
 
-### Key Functions
+**Key Functions/Components**:
+- **upload_file()**: Uploads files with unique IDs and user organization
+- **get_file()**: Downloads files by storage path or GCS URI
+- **delete_file()**: Removes files from storage
+- **get_signed_url()**: Generates temporary access URLs for private files
+- **list_user_files()**: Lists files with prefix filtering
+- **get_public_url()**: Constructs public URLs for accessible files
+- **copy_file()**: Duplicates files within GCS
+- **upload_string_as_file()**: Uploads text content as files
+- **upload_bytes_as_file()**: Uploads binary content as files
+- **download_file_as_string()**: Downloads files as text content
+- **delete_file_from_gcs()**: Deletes files by GCS URI
 
-#### `get_text_from_document(doc_metadata: dict) -> str`
-- **Purpose**: Extract text from document using Document AI
-- **Input**: Metadata dict with 'gcs_uri' and 'mimetype'
-- **Process**:
-  1. Creates GcsDocument with URI and MIME type
-  2. Sends ProcessRequest to Document AI processor
-  3. Extracts text from response
-- **Returns**: Extracted text (empty string if blank document)
-- **Errors**: Raises ContentRetrievalError on API failures
+**Inputs**:
+- File content (bytes, strings, or file-like objects)
+- Content types and metadata
+- User IDs for path organization
+- Storage paths and GCS URIs
 
-### Configuration
-- **Processor**: From GOOGLE_DOCUMENT_AI_PROCESSOR_NAME env var
-- **Client**: documentai.DocumentProcessorServiceClient
+**Outputs/Side Effects**:
+- Returns file metadata, content, or error states
+- Modifies GCS bucket contents
+- Generates access URLs with expiration
+
+**Dependencies**: Google Cloud Storage, UUID generation, environment configuration
+
+---
+
+### 5. tts_service.py
+
+**Purpose**: Advanced Text-to-Speech service using Google Cloud TTS with chunking, SSML generation, timepoint mapping, and accessibility features for students with learning disabilities.
+
+**Key Functions/Components**:
+- **synthesize_text()**: Main synthesis method with chunking for large texts
+- **_chunk_text()**: Intelligent text chunking preserving paragraph boundaries
+- **_build_ssml_and_map()**: Creates SSML with word-level timepoint markers
+- **get_available_voices()**: Lists available TTS voices with metadata
+- **is_functional()**: Checks service initialization status
+- **_check_client()**: Client availability validation
+
+**Special Features**:
+- Paragraph-aware chunking to maintain speech flow
+- SSML mark generation for word-level highlighting
+- Timepoint mapping for synchronized text highlighting
+- Support for various audio encodings (MP3, WAV, etc.)
+- Configurable voice parameters (rate, pitch, voice selection)
+
+**Inputs**:
+- Text content for synthesis
+- Voice configuration parameters
+- Audio encoding preferences
+
+**Outputs/Side Effects**:
+- Returns audio content with timepoint data
+- Generates structured timing information for UI synchronization
+- Handles large texts through chunked processing
+
+**Dependencies**: Google Cloud Text-to-Speech, text sanitization utilities, logging
+
+---
+
+### 6. stt_service.py
+
+**Purpose**: Speech-to-Text service providing real-time and batch transcription capabilities with extensive configuration options and debugging features for audio input processing.
+
+**Key Functions/Components**:
+- **transcribe_audio_bytes()**: Core transcription for byte data with detailed metadata
+- **transcribe_audio_file()**: File-based transcription with format handling
+- **transcribe_audio_batch()**: Async batch processing for GCS URIs
+- **streaming_recognize()**: Real-time streaming transcription
+- **create_streaming_config()**: Configuration for streaming requests
+- **get_supported_languages()**: Returns supported language list
+
+**Special Features**:
+- Multiple audio format support (FLAC, WAV, MP3, WebM)
+- Configurable language models and recognition settings
+- Debug audio file saving for troubleshooting
+- Detailed transcription metadata including confidence scores
+- Batch processing for large audio files
+- Streaming capabilities for real-time applications
+
+**Inputs**:
+- Audio content (bytes, files, or GCS references)
+- Recognition configuration parameters
+- Language and model preferences
+
+**Outputs/Side Effects**:
+- Returns transcription results with confidence scores
+- Provides detailed processing metadata
+- Saves debug audio files for troubleshooting
+- Handles various audio formats and sources
+
+**Dependencies**: Google Cloud Speech-to-Text, file system operations, logging
+
+---
+
+### 7. doc_ai_service.py
+
+**Purpose**: Document AI service for extracting text content from documents using Google Cloud Document AI, supporting OCR and document understanding for various file types.
+
+**Key Functions/Components**:
+- **get_text_from_document()**: Main text extraction method
+- Service initialization with processor configuration
+- Error handling for content retrieval failures
+
+**Special Features**:
+- GCS document processing
+- Multiple MIME type support
+- Async interface design
+- Comprehensive error handling
+
+**Inputs**:
+- Document metadata with GCS URI and MIME type
+- Processor configuration from environment
+
+**Outputs/Side Effects**:
+- Returns extracted text content
+- Handles processing errors gracefully
+- Logs detailed operation information
+
+**Dependencies**: Google Cloud Document AI, logging utilities
+
+---
+
+### 8. doc_retrieval_service.py
+
+**Purpose**: High-level document retrieval service that coordinates between Firestore and Storage services to provide unified access to document content with multiple fallback strategies.
+
+**Key Functions/Components**:
+- **get_document_metadata()**: Retrieves document metadata with error handling
+- **get_document_content()**: Multi-source content retrieval with prioritization
+- **get_document_text()**: Text-only retrieval with optional user verification
+- **chunk_document_text()**: Intelligent text chunking for LLM context windows
+- **get_document_chunks()**: Chunked content retrieval for processing
+- **get_document_content_for_quiz()**: Optimized content extraction for quiz generation
+
+**Special Features**:
+- Multi-source content retrieval (DUA narrative, OCR, GCS, Firestore subcollection)
+- User ownership verification
+- Intelligent text chunking with overlap
+- Content type validation
+- Fallback strategies for different storage scenarios
+
+**Content Retrieval Priority**:
+1. DUA narrative content (for processed_dua status)
+2. OCR text content (for processed status)
+3. GCS stored text files
+4. Firestore document_contents collection
+
+**Inputs**:
+- Document IDs and optional user IDs
+- Chunking parameters for text processing
+- Content length limits for specific use cases
+
+**Outputs/Side Effects**:
+- Returns structured content with source tracking
+- Provides text chunks for LLM processing
+- Handles access control and ownership verification
+
+**Dependencies**: FirestoreService, StorageService, text processing utilities
+
+---
+
+## Service Architecture Patterns
+
+### Singleton Pattern
+All services implement singleton patterns to ensure:
+- Single connection instance per service
+- Resource efficiency
+- Consistent state management
+- Thread-safe initialization
 
 ### Error Handling
-- Validates environment variables on init
-- Logs detailed error messages
-- Gracefully handles initialization failures (sets client=None)
+Consistent error handling across all services:
+- Graceful degradation when services are unavailable
+- Detailed error logging for debugging
+- Structured error responses
+- Exception catching with informative messages
 
----
-
-## File: `backend/services/doc_retrieval_service.py`
-
-### Purpose
-Unified document content retrieval from Firestore or GCS.
-
-### Key Functions
-
-#### `get_document_metadata(document_id) -> Tuple[bool, Optional[Dict]]`
-- **Purpose**: Retrieve document metadata from Firestore
-- **Returns**: `(success, document_data or error_dict)`
-
-#### `get_document_content(document_id) -> Tuple[bool, Optional[Dict]]`
-- **Purpose**: Retrieve document content with intelligent source prioritization
-- **Priority Order**:
-  1. **DUA Narrative** (status='processed_dua'): Uses 'dua_narrative_content' field
-  2. **OCR Text** (status='processed'): Uses 'ocr_text_content' field
-  3. **GCS Storage**: Downloads from gcs_uri/storage_path
-  4. **Firestore Subcollection**: Checks 'document_contents' collection
-- **Image Detection**: Checks mime_type and file_type to prevent text decoding of images
-- **Returns**: Dict with 'content', 'source', 'file_type'
-
-#### `get_document_text(document_id, user_id) -> Tuple[bool, Union[str, Dict]]`
-- **Purpose**: Get text content with optional ownership verification
-- **Returns**: `(success, text_content or error_dict)`
-
-#### `chunk_document_text(text, chunk_size=4000, overlap=200) -> List[str]`
-- **Purpose**: Split text into overlapping chunks for LLM context windows
-- **Smart Breaking**: Prefers newlines, then spaces, then hard breaks
-
-#### `get_document_chunks(document_id, user_id, chunk_size, overlap)`
-- **Purpose**: Get document as chunked text list
-
-#### `get_document_content_for_quiz(document_id, max_length=10000)`
-- **Purpose**: Get content snippet for quiz generation
-- **Returns**: `(success, snippet, error_message)`
-
-### Dependencies
-- FirestoreService: Metadata and subcollection access
-- StorageService: GCS file downloads
-
-### Pattern
-Singleton pattern with graceful degradation if services unavailable.
-
----
-
-## File: `backend/services/tts_service.py`
-
-### Purpose
-Google Cloud Text-to-Speech with chunking and synchronized timepoints.
-
-### Key Functions
-
-#### `synthesize_text(text, voice_name, speaking_rate, pitch, audio_encoding, sample_rate_hertz)`
-- **Purpose**: Convert text to speech with word-level timing
-- **Process**:
-  1. Sanitizes text using `sanitize_text_for_tts`
-  2. Chunks text (max 2500 chars) preserving paragraphs
-  3. Builds SSML with `<mark>` tags for each word/space
-  4. Adds paragraph break markers with timed `<break>` elements
-  5. Synthesizes each chunk via Google TTS API
-  6. Aggregates audio chunks and adjusts timepoints
-- **Returns**: Dict with 'audio_content' (bytes) and 'timepoints' (array)
-- **Timepoints**: Include both word markers and PARAGRAPH_BREAK markers
-
-#### `_chunk_text(text) -> list[str]`
-- **Purpose**: Split text into TTS-compatible chunks
-- **Strategy**:
-  - Preserves paragraph boundaries (double newlines)
-  - Splits large paragraphs by sentences
-  - Handles edge cases (very long sentences)
-- **Max Chunk Size**: 2500 characters (leaves room for SSML overhead)
-
-#### `_build_ssml_and_map(plain_text)`
-- **Purpose**: Generate SSML with timing marks
-- **SSML Structure**:
-  - `<p>` tags for paragraphs
-  - `<mark name="part_N"/>` before each word/space
-  - `<mark name="p_break_N"/>` + `<break time="750ms"/>` after each paragraph
-- **Returns**: `(ssml_string, marks_map)` where marks_map links mark names to text
-
-#### `get_available_voices(language_code)`
-- **Purpose**: List available TTS voices
-- **Returns**: List of voice details (name, gender, sample rate, language codes)
-
-### Configuration
-- **Model**: texttospeech_v1beta1 (supports timepoint generation)
-- **Default Voice**: en-US-Standard-C (from TTS_DEFAULT_VOICE_NAME env var)
-- **Default Rate**: 1.0, **Default Pitch**: 0.0
-- **Credentials**: From FIREBASE_SERVICE_ACCOUNT_KEY_PATH
-
-### Logging
-- Uses DEBUG level for TTS_TRACE logs (detailed chunking/SSML info)
-- Logs paragraph counts, chunk sizes, timepoint processing
-
-### Pattern
-Singleton pattern with functional check via `is_functional()`.
-
----
-
-## File: `backend/services/stt_service.py`
-
-### Purpose
-Google Cloud Speech-to-Text for audio transcription.
-
-### Key Functions
-
-#### `transcribe_audio_bytes(audio_bytes, encoding, sample_rate_hertz, language_code, audio_channel_count, enable_automatic_punctuation, model)`
-- **Purpose**: Transcribe audio bytes using non-streaming recognition
-- **Encoding Support**: FLAC, LINEAR16 (WAV), MP3, WEBM_OPUS
-- **FLAC Handling**: Omits sample_rate and channel_count (derived from header)
-- **Returns**: `(success, result_details)` with transcript, confidence, metadata
-- **Debug**: Saves audio to `debug_audio/debug_audio_sent_to_api_{timestamp}.{ext}`
-
-#### `transcribe_audio_file(file_path, encoding, sample_rate_hertz, language_code, ...)`
-- **Purpose**: Transcribe from file path
-- **Process**: Reads file → calls `transcribe_audio_bytes`
-
-#### `transcribe_audio_batch(audio_reference: str) -> dict`
-- **Purpose**: Async long-running recognition for GCS URIs
-- **Input**: GCS URI (e.g., `gs://bucket/audio.wav`)
-- **Returns**: Dict with 'transcript' or 'error'
-- **Timeout**: 300 seconds (5 minutes)
-
-#### `streaming_recognize(config, requests_iterator)`
-- **Purpose**: Streaming speech recognition
-- **Returns**: Iterator of StreamingRecognizeResponse objects
-
-#### `create_streaming_config(...)`
-- **Purpose**: Create StreamingRecognitionConfig
-- **Returns**: `(success, config)` tuple
-
-### Configuration
-- **Default Model**: latest_short (from STT_DEFAULT_MODEL env var)
-- **Default Language**: en-US (from STT_DEFAULT_LANGUAGE_CODE env var)
-- **Credentials**: From FIREBASE_SERVICE_ACCOUNT_KEY_PATH
-
-### Error Handling
-- Validates audio_bytes presence
-- Logs detailed config and audio size
-- Checks total_billed_time (warns if zero)
-- Full traceback on exceptions
-
-### Pattern
-Singleton pattern with client availability check.
-
----
-
-## Summary
+### Environment Configuration
+All services rely on environment variables for:
+- Authentication credentials
+- Service endpoints and configuration
+- Feature flags and defaults
+- Security parameters
 
 ### Service Dependencies
-```
-DocumentRetrievalService
-  ├── FirestoreService
-  └── StorageService
+Services are designed with clear dependency hierarchy:
+- AuthService: Standalone Firebase integration
+- StorageService: Standalone GCS integration
+- FirestoreService: Standalone Firestore integration
+- DocAIService: Standalone Document AI integration
+- TTSService/STTService: Standalone Google Cloud AI services
+- DocumentRetrievalService: Coordinates Firestore and Storage services
 
-DocAIService (standalone)
-
-TTSService (standalone)
-  └── Uses: backend.utils.text_utils.sanitize_text_for_tts
-
-STTService (standalone)
-
-AuthService (standalone)
-```
-
-### Common Patterns
-1. **Singleton Pattern**: All services use singleton to ensure single connection
-2. **Tuple Returns**: `(success: bool, data_or_error)` pattern for error handling
-3. **Environment Configuration**: All services read from .env via os.getenv()
-4. **Graceful Degradation**: Services handle initialization failures without crashing app
-5. **Comprehensive Logging**: Detailed logging for debugging and monitoring
+This modular design allows for partial functionality when some services are unavailable and supports independent testing and maintenance of each service component.

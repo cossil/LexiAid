@@ -1,210 +1,143 @@
 # Frontend Services Analysis
 
-## File: `src/services/api.ts`
+## Overview
+The frontend services provide a centralized API communication layer that handles all backend interactions, authentication, data transformation, and error handling. The service layer abstracts away the complexity of HTTP requests and provides a clean, type-safe interface for the rest of the application.
 
-### Purpose
-Centralized API service for all backend communication.
+## Service Components
 
-### Axios Instance Configuration
-```typescript
-baseURL: import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'
-headers: { 'Content-Type': 'application/json' }
-```
+### 1. api.ts
 
-### Request Interceptor
-- **Purpose**: Auto-inject Firebase auth token
-- **Process**:
-  1. Gets currentUser from Firebase auth
-  2. Calls `currentUser.getIdToken()`
-  3. Adds to `Authorization: Bearer {token}` header
-- **Error Handling**: Logs error, continues without token
+**Purpose**: Comprehensive API service providing centralized communication with the LexiAid backend, including authentication, document management, chat functionality, and specialized features like answer formulation.
 
-### API Methods
+**Key Functions/Components**:
 
-#### Authentication
-```typescript
-getAuthToken(): Promise<string | null>
-```
-- Returns current user's Firebase ID token
-- Used by other services for manual auth
+#### Core Infrastructure
+- **Axios Instance**: Configured HTTP client with base URL and default headers
+- **Authentication Interceptor**: Automatic token injection for all API requests
+- **Error Handling**: Centralized error handling and response transformation
+- **Type Safety**: Full TypeScript interfaces for all API requests and responses
 
-#### Chat
-```typescript
-chat(payload: { query, documentId?, threadId? }): Promise<ChatResponse>
-```
-- **Endpoint**: `POST /api/v2/agent/chat`
-- **Response Mapping**:
-  - `final_agent_response` → `agent_response`
-  - `active_quiz_thread_id` → `thread_id` (prioritized)
-  - `quiz_active` → `is_quiz`
-  - `quiz_complete` → `quiz_completed`
-- **Returns**: Agent response, thread ID, audio, timepoints, quiz flags
+#### Authentication & Token Management
+- **Token Injection**: Automatic Bearer token attachment to all requests
+- **Token Refresh**: ID token generation and refresh functionality
+- **Error Recovery**: Graceful handling of token failures and authentication errors
+- **User Context**: Integration with Firebase Authentication for user management
 
-```typescript
-uploadAudioMessage(formData, options): Promise<AudioResponse>
-```
-- **Endpoint**: `POST /api/v2/agent/chat` (multipart)
-- **Options**: `sttProcessingMode: 'review' | 'direct_send'`
-- **FormData**: audio_file, document_id, thread_id, transcript (optional)
-- **Returns**: Response text, thread ID, transcript, quiz state
+#### Chat & AI Services
+- **Chat API**: Core chat functionality with document context and thread management
+- **Audio Upload**: Support for both review and direct send audio processing modes
+- **Quiz Management**: Quiz session creation, continuation, and cancellation
+- **Response Mapping**: Intelligent mapping between backend and frontend response formats
 
-#### TTS
-```typescript
-synthesizeText(text: string): Promise<{ audioContent, timepoints }>
-```
-- **Endpoint**: `POST /api/tts/synthesize`
-- **Request**: `{ text }`
-- **Response**: Base64 audio + word timepoints
-- **Mapping**: `audio_content` → `audioContent` (camelCase)
+#### Document Management
+- **Document CRUD**: Complete create, read, update, delete operations for documents
+- **File Upload**: Multipart form data upload with metadata support
+- **Content Retrieval**: Document content fetching with include options
+- **Asset Management**: TTS asset retrieval with signed URLs
 
-```typescript
-getTtsAssets(documentId): Promise<{ audio_url, timepoints_url }>
-```
-- **Endpoint**: `GET /api/documents/{id}/tts-assets`
-- **Returns**: Pre-signed URLs for pre-generated TTS assets
+#### Text-to-Speech Services
+- **On-Demand Synthesis**: Real-time text-to-speech conversion with timepoints
+- **Asset Retrieval**: Pre-generated TTS asset access with URL generation
+- **Audio Processing**: Base64 audio content handling and management
+- **Timepoint Support**: Word-level timing data for synchronized highlighting
 
-#### Documents
-```typescript
-getDocument(documentId): Promise<DocumentData>
-```
-- **Endpoint**: `GET /api/documents/{id}?include_content=true`
-- **Returns**: Full document with content
+#### Answer Formulation API
+- **Transcript Refinement**: AI-powered refinement of spoken transcripts
+- **Edit Commands**: Voice-based editing with session management
+- **Session Tracking**: Complete session lifecycle management
+- **Fidelity Scoring**: Quality assessment and iteration tracking
 
-```typescript
-listDocuments(): Promise<Document[]>
-```
-- **Endpoint**: `GET /api/documents`
-- **Returns**: Array of document metadata
+#### User Profile Services
+- **Profile Management**: User profile retrieval and updates
+- **Preference Sync**: User preference synchronization with backend
+- **Metadata Handling**: Flexible metadata storage and retrieval
+- **Account Management**: Complete user account operations
 
-```typescript
-uploadDocument(file, metadata?): Promise<Document>
-```
-- **Endpoint**: `POST /api/documents`
-- **Content-Type**: multipart/form-data
-- **FormData**: file, metadata (JSON string)
+**API Methods**:
 
-```typescript
-deleteDocument(documentId): Promise<void>
-```
-- **Endpoint**: `DELETE /api/documents/{id}`
+##### Authentication Methods
+- **getAuthToken()**: Retrieves current user's Firebase ID token
+- **Token Injection**: Automatic interceptor-based token attachment
 
-#### Quiz
-```typescript
-startQuiz(documentId, threadId?): Promise<QuizResponse>
-```
-- **Endpoint**: `POST /api/v2/agent/chat`
-- **Query**: `Start a quiz for document {documentId}`
-- **Response Mapping**:
-  - `final_agent_response` → `agent_response` (prioritized)
-  - `active_quiz_thread_id` → `thread_id` (prioritized)
+##### Chat & Communication
+- **chat(payload)**: Sends chat queries with document and thread context
+- **uploadAudioMessage(formData, options)**: Handles audio uploads with processing modes
+- **cancelQuiz(threadId)**: Cancels active quiz sessions
 
-```typescript
-continueQuiz(threadId, answer, documentId?): Promise<QuizResponse>
-```
-- **Endpoint**: `POST /api/v2/agent/chat`
-- **Query**: User's answer
-- **Returns**: Next question or completion message
+##### Document Operations
+- **getDocument(documentId)**: Retrieves document details with content
+- **listDocuments()**: Fetches user's document collection
+- **uploadDocument(file, metadata)**: Uploads files with metadata
+- **deleteDocument(documentId)**: Removes documents from storage
 
-```typescript
-cancelQuiz(threadId): Promise<void>
-```
-- **Endpoint**: `POST /api/v2/agent/chat`
-- **Query**: `/cancel_quiz`
+##### TTS Services
+- **synthesizeText(text)**: Converts text to speech with timepoints
+- **getTtsAssets(documentId)**: Retrieves pre-generated TTS assets
 
-#### User Profile
-```typescript
-getUserProfile(): Promise<UserProfile>
-```
-- **Endpoint**: `GET /api/users/profile`
+##### Answer Formulation
+- **refineAnswer(request)**: Refines transcripts into written answers
+- **editAnswer(request)**: Applies voice-based edit commands
 
-```typescript
-updateUserProfile(updates): Promise<void>
-```
-- **Endpoint**: `PATCH /api/users/profile`
+##### User Management
+- **getUserProfile()**: Retrieves user profile and preferences
+- **updateUserProfile(updates)**: Updates user profile information
+
+**Inputs**:
+- Authentication tokens from Firebase
+- User data and preferences
+- Document files and metadata
+- Audio recordings and text content
+
+**Outputs/Side Effects**:
+- HTTP requests to backend APIs
+- Transformed response data
+- Error handling and user feedback
+- Token refresh and authentication state updates
+
+**Dependencies**: 
+- Axios for HTTP client functionality
+- Firebase Authentication for token management
+- TypeScript interfaces for type safety
+- Environment configuration for API URLs
 
 ---
 
-## Response Mapping Strategy
+## Service Architecture Patterns
 
-### Backend → Frontend Field Mapping
-The API service normalizes backend snake_case to frontend camelCase:
+### Design Principles
+- **Centralized Communication**: Single point of contact for all backend interactions
+- **Abstraction Layer**: Hides HTTP complexity from application components
+- **Type Safety**: Comprehensive TypeScript interfaces for all operations
+- **Error Handling**: Consistent error handling and user feedback
 
-| Backend Field | Frontend Field | Notes |
-|--------------|----------------|-------|
-| final_agent_response | agent_response | Prioritized for quiz |
-| active_quiz_thread_id | thread_id | Prioritized over thread_id |
-| quiz_active | is_quiz | Boolean flag |
-| quiz_complete | quiz_completed | Completion status |
-| audio_content_base64 | audio_content_base64 | Kept as-is |
-| audio_content | audioContent | TTS endpoint |
+### Authentication Strategy
+- **Automatic Token Injection**: Interceptor-based token management
+- **Token Refresh**: Seamless token refresh for long-running sessions
+- **Error Recovery**: Graceful handling of authentication failures
+- **User Context**: Integration with Firebase Authentication system
+
+### Data Transformation
+- **Response Mapping**: Intelligent mapping between backend and frontend formats
+- **Type Coercion**: Proper type conversion and validation
+- **Normalization**: Consistent data structure across the application
+- **Legacy Support**: Backward compatibility with API changes
 
 ### Error Handling
-- Try-catch blocks on all async methods
-- Logs errors to console
-- Returns error objects: `{ error: string }`
-- Throws errors for caller to handle (TTS synthesis)
+- **Centralized Error Management**: Consistent error handling across all methods
+- **User-Friendly Messages**: Transformed technical errors into user feedback
+- **Logging Integration**: Comprehensive error logging for debugging
+- **Graceful Degradation**: Fallback behavior for service failures
 
----
+### Performance Optimization
+- **Request Interception**: Efficient token management and request modification
+- **Response Caching**: Potential for response caching strategies
+- **Connection Reuse**: Axios instance reuse for connection pooling
+- **Lazy Loading**: On-demand service initialization
 
-## Usage Patterns
+### Integration Patterns
+- **Context Integration**: Seamless integration with React contexts
+- **Hook Compatibility**: Designed to work with custom hooks
+- **Component Abstraction**: Clean separation from UI components
+- **Service Composition**: Composable service methods for complex operations
 
-### In Components
-```typescript
-// Chat
-const response = await apiService.chat({ 
-  query: userInput, 
-  documentId, 
-  threadId 
-});
-
-// Audio upload
-const formData = new FormData();
-formData.append('audio_file', audioBlob);
-const response = await apiService.uploadAudioMessage(formData);
-
-// TTS
-const { audioContent, timepoints } = await apiService.synthesizeText(text);
-
-// Documents
-const doc = await apiService.getDocument(documentId);
-const docs = await apiService.listDocuments();
-```
-
-### In Hooks
-```typescript
-// useTTSPlayer
-const { audio_url, timepoints_url } = await apiService.getTtsAssets(documentId);
-
-// useRealtimeStt
-// Uses WebSocket directly, not apiService
-```
-
----
-
-## Summary
-
-### API Coverage
-- ✅ Chat (text & audio)
-- ✅ TTS (synthesis & pre-generated assets)
-- ✅ STT (file upload via chat endpoint)
-- ✅ Documents (CRUD)
-- ✅ Quiz (start, continue, cancel)
-- ✅ User profile & preferences
-
-### Key Features
-1. **Auto-Authentication**: Interceptor adds token to all requests
-2. **Response Normalization**: Maps backend fields to frontend conventions
-3. **Type Safety**: TypeScript interfaces for all responses
-4. **Error Handling**: Consistent error structure
-5. **Multipart Support**: Handles file uploads (audio, documents)
-6. **Dual STT Modes**: Review and direct_send
-
-### Environment Configuration
-- `VITE_BACKEND_API_URL`: Backend base URL (default: http://localhost:8000)
-- Firebase config for authentication
-
-### Integration Points
-- **AuthContext**: Uses auth.currentUser for tokens
-- **Hooks**: useTTSPlayer, useOnDemandTTSPlayer call TTS methods
-- **Pages**: All pages use apiService for data fetching
-- **Components**: GeminiChatInterface uses chat methods
+This service architecture provides a robust, maintainable, and scalable foundation for frontend-backend communication, with proper separation of concerns, comprehensive error handling, and type safety throughout the application. The centralized API service ensures consistent behavior and simplifies maintenance while providing the flexibility needed for complex features like chat, document management, and answer formulation.

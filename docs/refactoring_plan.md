@@ -1,397 +1,342 @@
 # Refactoring Plan
 
 ## Overview
-This plan provides a safe, step-by-step approach to removing deprecated code and improving the codebase structure. Each step is designed to be independently testable and reversible.
+This document provides a step-by-step guide for safely removing deprecated code from the LexiAid codebase. Each step details which import statements or function calls need to be deleted from active files.
 
-## Phase 1: Remove Deprecated Files (No Code Changes)
+## Phase 1: Immediate Safe Deletions
 
-### Step 1.1: Remove Deprecated Agent Files
-**Risk**: LOW | **Impact**: None | **Testing**: None required
+### Step 1.1: Remove DeprecationShowcase Component
+**Files to Delete:**
+```
+src/pages/dev/DeprecationShowcase.tsx
+```
 
+**Impact Analysis:**
+- No active imports found
+- No routing references
+- Safe to delete immediately
+
+**Verification Commands:**
 ```bash
-# Delete deprecated AiTutorAgent prompt
-rm backend/agent/system_prompt_ai_tutor_v2.md
-
-# Verify directory is now empty (except __pycache__)
-ls backend/agent/
+# Search for any references to DeprecationShowcase
+grep -r "DeprecationShowcase" src/
+grep -r "dev/DeprecationShowcase" src/
 ```
 
-**Verification**: Directory should only contain `__pycache__/`
+**Expected Results:** No matches found
 
 ---
 
-### Step 1.2: Remove Diagnostic Tools
-**Risk**: LOW | **Impact**: None | **Testing**: None required
+### Step 1.2: Remove Unused Static Assets
+**Files to Delete:**
+```
+.env.example.old
+public/icons/old-icon.svg
+src/assets/unused-images/ (entire directory)
+```
 
+**Impact Analysis:**
+- Static assets only, no code dependencies
+- Safe to delete immediately
+
+**Verification Commands:**
 ```bash
-# Delete disabled file usage tracker
-rm backend/file_usage_tracker.py
-rm backend/used_python_files_log.txt
+# Check for references to old environment file
+grep -r ".env.example.old" .
+grep -r "old-icon.svg" src/
+grep -r "unused-images" src/
 ```
 
-**Verification**: Files no longer exist
+**Expected Results:** No matches found
 
 ---
 
-### Step 1.3: Remove Deprecated Test Files
-**Risk**: LOW | **Impact**: None | **Testing**: Run remaining tests
+## Phase 2: Component Cleanup
 
+### Step 2.1: Remove DocumentView Page
+**Files to Delete:**
+```
+src/pages/DocumentView.tsx
+```
+
+**Pre-deletion Verification:**
 ```bash
-# Delete tests for deprecated code
-rm -rf backend/tests/deprecation/
-
-# Run remaining tests to ensure nothing broke
-cd backend
-pytest tests/
+# Search for all imports and references
+grep -r "DocumentView" src/
+grep -r "pages/DocumentView" src/
 ```
 
-**Verification**: All remaining tests pass
+**Expected Results:** Should show no active imports
+
+**Files to Check for Potential References:**
+- `src/App.tsx` - Routing configuration
+- `src/layouts/DashboardLayout.tsx` - Navigation
+- Any test files that might import this component
+
+**If References Found:**
+1. Remove import statement: `import DocumentView from './pages/DocumentView';`
+2. Remove route entry: `<Route path="/document/:id" element={<DocumentView />} />`
+3. Remove any navigation links pointing to `/document/:id`
 
 ---
 
-## Phase 2: Remove OCRTool References
-
-### Step 2.1: Update document_routes.py
-**Risk**: MEDIUM | **Impact**: OCR fallback no longer available | **Testing**: Document upload
-
-**File**: `backend/routes/document_routes.py`
-
-**Changes**:
-```python
-# Lines 274-309: Replace OCR processing block
-
-# OLD CODE (DELETE):
-if should_run_ocr:
-    current_app.logger.info(f"Document {document_id} ({file_extension}) is OCR eligible. Attempting OCR.")
-    final_fs_update_payload['status'] = 'processing_ocr'
-    firestore_service.update_document(document_id, {'status': 'processing_ocr', 'updated_at': datetime.now(timezone.utc).isoformat()})
-
-    ocr_tool = current_app.config['TOOLS'].get('OCRTool')
-    if ocr_tool:
-        try:
-            ocr_success, ocr_data = ocr_tool.process_document(gcs_uri, file.mimetype)
-            if ocr_success and ocr_data:
-                ocr_text = ocr_data.get('text', '')
-                if ocr_text.strip():
-                    final_fs_update_payload['ocr_text_content'] = ocr_text
-                    final_fs_update_payload['status'] = 'processed_ocr'
-                    final_fs_update_payload['processing_error'] = None
-                    ocr_text_content_produced = True
-                    current_app.logger.info(f"OCR successfully processed document {document_id}.")
-                else:
-                    final_fs_update_payload['status'] = 'ocr_empty_result'
-                    final_fs_update_payload['processing_error'] = 'OCR processed but yielded no text.'
-                    current_app.logger.info(f"OCR processed document {document_id} but yielded no text.")
-            else:
-                error_msg = ocr_data.get('error', 'OCR processing failed.')
-                final_fs_update_payload['status'] = 'ocr_failed'
-                final_fs_update_payload['processing_error'] = error_msg
-                current_app.logger.error(f"OCR processing failed for {document_id}: {error_msg}")
-        except Exception as e_ocr:
-            current_app.logger.error(f"Exception during OCR for {document_id}: {e_ocr}", exc_info=True)
-            final_fs_update_payload['status'] = 'ocr_failed'
-            final_fs_update_payload['processing_error'] = f"OCR execution error: {str(e_ocr)}"
-    else:
-        current_app.logger.warning("OCRTool not available. Skipping OCR.")
-        final_fs_update_payload['status'] = 'ocr_skipped_tool_unavailable'
-    
-    final_fs_update_payload['updated_at'] = datetime.now(timezone.utc).isoformat()
-    firestore_service.update_document(document_id, final_fs_update_payload)
-
-# NEW CODE (ADD):
-if should_run_ocr:
-    current_app.logger.warning(f"OCR functionality has been deprecated. Document {document_id} will be marked as 'ocr_unavailable'.")
-    final_fs_update_payload['status'] = 'ocr_unavailable'
-    final_fs_update_payload['processing_error'] = 'OCR processing is no longer supported. Please re-upload as a DUA-eligible format (PDF, PNG, JPG, JPEG) for full processing.'
-    final_fs_update_payload['updated_at'] = datetime.now(timezone.utc).isoformat()
-    firestore_service.update_document(document_id, final_fs_update_payload)
+### Step 2.2: Remove Settings Page
+**Files to Delete:**
+```
+src/pages/Settings.tsx
 ```
 
-**Also Remove**:
-```python
-# Line 16: Remove commented import
-# from ..services import FirestoreService, StorageService, OCRTool # Example structure
-
-# Line 95: Remove OCR_ELIGIBLE_EXTENSIONS (or keep for reference)
-# OCR_ELIGIBLE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'tiff'}
-```
-
-**Testing**:
-1. Upload a DUA-eligible file (PDF, PNG, JPG) → Should process with DUA
-2. Upload a non-DUA file (TXT) → Should get 'ocr_unavailable' status
-3. Check Firestore for correct status and error message
-
----
-
-### Step 2.2: Delete OCRTool Directory
-**Risk**: LOW | **Impact**: None (already unused) | **Testing**: Backend startup
-
+**Pre-deletion Verification:**
 ```bash
-# Delete tools directory
-rm -rf backend/tools/
+# Search for all references
+grep -r "Settings" src/
+grep -r "pages/Settings" src/
 ```
 
-**Testing**:
+**Expected Results:** Should show no active imports
+
+**Files to Check for Potential References:**
+- `src/App.tsx` - Route definitions
+- `src/layouts/DashboardLayout.tsx` - Navigation menu
+- Any component that might link to settings
+
+**If References Found:**
+1. Remove import: `import Settings from './pages/Settings';`
+2. Remove route: `<Route path="/settings" element={<Settings />} />`
+3. Remove navigation link or menu item
+
+---
+
+### Step 2.3: Remove Orphaned Landing Page Components
+**Files to Delete:**
+```
+src/components/Hero.tsx
+src/components/CTA.tsx
+src/components/FeatureCard.tsx
+src/components/Features.tsx
+src/components/Navbar.tsx
+src/components/Footer.tsx
+src/components/MessageWithTTS.tsx
+```
+
+**Pre-deletion Verification:**
 ```bash
-# Start backend server
-cd backend
-flask --app app.py --debug run --port 5000
-
-# Verify no import errors
-# Check logs for successful startup
+# Check each component individually
+for component in Hero CTA FeatureCard Features Navbar Footer MessageWithTTS; do
+  echo "=== Checking $component ==="
+  grep -r "$component" src/ --exclude-dir=dev
+done
 ```
 
-**Verification**: Server starts without errors
+**Expected Results:** Should only show references in DeprecationShowcase (already being deleted)
+
+**If References Found:**
+For each file that imports these components:
+1. Remove import statements:
+   ```typescript
+   import Hero from '../components/Hero';
+   import CTA from '../components/CTA';
+   // ... etc for each component
+   ```
+2. Remove JSX usage:
+   ```typescript
+   <Hero />
+   <CTA />
+   // ... etc for each component
+   ```
 
 ---
 
-## Phase 3: Remove DocAIService
+## Phase 3: Backend Cleanup
 
-### Step 3.1: Remove DocAIService Initialization
-**Risk**: LOW | **Impact**: None (service not used) | **Testing**: Backend startup
-
-**File**: `backend/app.py`
-
-**Changes**:
-```python
-# Lines 132-134: DELETE
-docai_service = initialize_component(DocAIService, 'DocAIService', 'SERVICES')
-if docai_service:
-    app.config['DOCAI_SERVICE'] = docai_service
+### Step 3.1: Remove Legacy Route Files
+**Files to Delete:**
+```
+backend/routes/legacy_routes.py (if exists)
 ```
 
-**Also Remove Import**:
-```python
-# Line ~50: DELETE
-from backend.services.doc_ai_service import DocAIService
-```
-
-**Testing**:
+**Pre-deletion Verification:**
 ```bash
-# Start backend
-flask --app app.py --debug run --port 5000
-
-# Verify no errors
-# Test document upload (DUA should still work)
+# Check for imports in main app
+grep -r "legacy_routes" backend/
+grep -r "import.*legacy" backend/app.py
 ```
+
+**Files to Check:**
+- `backend/app.py` - Blueprint registration
+
+**If References Found:**
+1. Remove import: `from backend.routes import legacy_routes`
+2. Remove blueprint registration: `app.register_blueprint(legacy_routes.bp)`
 
 ---
 
-### Step 3.2: Delete DocAIService File
-**Risk**: LOW | **Impact**: None | **Testing**: None required
+### Step 3.2: Remove Old Migration Scripts
+**Files to Delete:**
+```
+backend/migrations/old_migration_scripts/ (directory)
+```
 
+**Pre-deletion Verification:**
 ```bash
-rm backend/services/doc_ai_service.py
+# Check if migrations are referenced
+grep -r "old_migration_scripts" backend/
 ```
 
-**Verification**: File deleted, backend still starts
+**Safety Check:**
+- Verify these migrations have already been applied to production
+- Check migration history to ensure they're not needed for rollbacks
 
 ---
 
-## Phase 4: Optional Cleanup
+## Phase 4: Import Cleanup
 
-### Step 4.1: Remove firestore_schema.js (Optional)
-**Risk**: LOW | **Impact**: Lose schema documentation | **Testing**: None
+### Step 4.1: Clean Up Unused Imports
+After deleting components, clean up any remaining unused imports:
 
-**Decision Point**: 
-- If schema is documented elsewhere → DELETE
-- If this is the only schema reference → KEEP
-
+**Check for Unused Imports:**
 ```bash
-# Only if schema is documented elsewhere
-rm backend/firestore_schema.js
+# Use ESLint to find unused imports
+npx eslint src/ --rule "no-unused-vars: error" --fix
+
+# Or manually check common files
+grep -r "import.*DocumentView" src/
+grep -r "import.*Settings" src/
+grep -r "import.*Hero" src/
+grep -r "import.*CTA" src/
+```
+
+**Files to Clean:**
+- Any files that imported deleted components
+- Type definition files that referenced deleted components
+- Test files that imported deleted components
+
+---
+
+## Phase 5: Testing and Verification
+
+### Step 5.1: Build Verification
+**Commands:**
+```bash
+# Clean build
+npm run build
+
+# Check for build errors
+npm run lint
+
+# Run tests to ensure no broken references
+npm run test
+```
+
+**Expected Results:**
+- Build completes successfully
+- No lint errors related to missing imports
+- All tests pass
+
+### Step 5.2: Runtime Verification
+**Manual Testing Checklist:**
+- [ ] Application starts successfully
+- [ ] All main routes load without errors
+- [ ] Navigation works correctly
+- [ ] No console errors about missing components
+- [ ] All active features work as expected
+
+### Step 5.3: Dependency Check
+**Commands:**
+```bash
+# Check for any unused dependencies
+npm depcheck
+
+# Or manually check package.json usage
+grep -r "from 'hero'" src/  # Should find no results
+grep -r "from 'cta'" src/   # Should find no results
 ```
 
 ---
 
-### Step 4.2: Clean Up Comments
-**Risk**: LOW | **Impact**: Code clarity | **Testing**: None
+## Phase 6: Documentation Updates
 
-**Files to Update**:
-1. `backend/app.py` - Remove comments about deprecated AiTutorAgent
-2. `backend/graphs/supervisor/graph.py` - Remove deprecated DocumentUnderstandingGraph references
+### Step 6.1: Update Documentation
+**Files to Update:**
+- `README.md` - Remove references to deleted components
+- Any API documentation that mentioned deleted routes
+- Component documentation that listed deleted components
 
-**Example**:
-```python
-# backend/app.py, around line 380
-# DELETE comment:
-# "The deprecated AiTutorAgent (ReAct-based) is no longer used by the application."
-```
-
----
-
-## Phase 5: Documentation Updates
-
-### Step 5.1: Update README
-**File**: `README.md` (if exists)
-
-**Add Section**:
-```markdown
-## Deprecated Features
-
-The following features have been removed:
-- **OCRTool**: Replaced by Document Understanding Agent (DUA)
-- **AiTutorAgent**: Replaced by LangGraph Supervisor architecture
-- **DocAIService**: Replaced by Vertex AI integration in DUA
-
-For documents requiring text extraction, please use DUA-eligible formats:
-- PDF, PNG, JPG, JPEG
-```
-
----
-
-### Step 5.2: Update Architecture Diagrams
-**Files**: Any architecture docs in `docs/`
-
-**Update**:
-- Remove OCRTool from diagrams
-- Remove AiTutorAgent references
-- Clarify DUA as primary document processing method
-
----
-
-## Testing Strategy
-
-### Regression Test Suite
-
-#### Test 1: Document Upload (DUA-eligible)
-```
-1. Upload a PDF file
-2. Verify status changes: uploading → processing_dua → processed_dua
-3. Verify dua_narrative_content is populated
-4. Verify TTS assets are pre-generated
-5. Verify document is viewable with TTS
-```
-
-#### Test 2: Document Upload (Non-DUA)
-```
-1. Upload a TXT file
-2. Verify status: uploading → uploaded → ocr_unavailable
-3. Verify processing_error message is clear
-4. Verify document metadata is saved
-```
-
-#### Test 3: Chat Functionality
-```
-1. Open chat for a DUA-processed document
-2. Send a text query
-3. Verify response is generated
-4. Verify TTS audio is included
-5. Send an audio query
-6. Verify STT transcription works
-7. Verify agent response
-```
-
-#### Test 4: Quiz Functionality
-```
-1. Start quiz for a document
-2. Verify first question is generated
-3. Answer question
-4. Verify feedback and next question
-5. Complete quiz
-6. Verify final summary with score
-```
-
-#### Test 5: TTS Playback
-```
-1. View a DUA-processed document
-2. Click "Read Aloud"
-3. Verify pre-generated audio loads
-4. Verify word highlighting works
-5. Click a word to seek
-6. Verify audio jumps to that word
+**Documentation Cleanup:**
+```bash
+# Search for documentation references
+grep -r "DocumentView" docs/
+grep -r "Settings" docs/
+grep -r "Hero" docs/
 ```
 
 ---
 
 ## Rollback Plan
 
-### If Issues Arise
+### If Issues Arise After Deletion
 
-#### Phase 1 Rollback (Files)
+**Immediate Rollback:**
 ```bash
-# Restore from git
-git checkout HEAD -- backend/agent/system_prompt_ai_tutor_v2.md
-git checkout HEAD -- backend/file_usage_tracker.py
-git checkout HEAD -- backend/used_python_files_log.txt
+# Restore from git if needed
+git checkout HEAD~1 -- src/pages/DocumentView.tsx
+git checkout HEAD~1 -- src/pages/Settings.tsx
+# etc for each deleted file
 ```
 
-#### Phase 2 Rollback (OCRTool)
-```bash
-# Restore document_routes.py
-git checkout HEAD -- backend/routes/document_routes.py
+**Partial Rollback:**
+- If specific functionality breaks, restore only the related files
+- Re-add imports that were mistakenly removed
+- Restore route definitions that were needed
 
-# Restore tools directory (if it existed)
-git checkout HEAD -- backend/tools/
-```
-
-#### Phase 3 Rollback (DocAIService)
-```bash
-# Restore app.py
-git checkout HEAD -- backend/app.py
-
-# Restore service file
-git checkout HEAD -- backend/services/doc_ai_service.py
-```
+**Verification After Rollback:**
+- Test the specific functionality that was broken
+- Ensure the fix doesn't introduce new issues
+- Document why the file was needed for future reference
 
 ---
 
-## Timeline Estimate
+## Safety Checklist
 
-| Phase | Duration | Risk | Can Run in Parallel |
-|-------|----------|------|---------------------|
-| Phase 1 | 15 min | LOW | No (sequential) |
-| Phase 2 | 30 min | MEDIUM | No (depends on Phase 1) |
-| Phase 3 | 20 min | LOW | Yes (independent of Phase 2) |
-| Phase 4 | 15 min | LOW | Yes (optional) |
-| Phase 5 | 30 min | LOW | Yes (documentation) |
-| **Testing** | 1-2 hours | - | After each phase |
+### Before Each Deletion Phase:
+- [ ] All references have been identified and removed
+- [ ] No active imports found in codebase
+- [ ] No routing references found
+- [ ] No test dependencies found
+- [ ] Documentation has been checked for references
 
-**Total Estimated Time**: 2.5-3.5 hours (including testing)
+### After Each Deletion Phase:
+- [ ] Application builds successfully
+- [ ] No lint errors
+- [ ] Tests pass
+- [ ] Manual testing confirms functionality
+- [ ] Git commit created with descriptive message
 
----
-
-## Success Criteria
-
-### Code Quality
-- ✅ No unused imports
-- ✅ No commented-out code blocks
-- ✅ No references to deprecated components
-- ✅ All tests pass
-
-### Functionality
-- ✅ Document upload works for DUA-eligible files
-- ✅ Chat functionality works
-- ✅ Quiz functionality works
-- ✅ TTS playback works (pre-generated and on-demand)
-- ✅ STT (real-time and file upload) works
-
-### Documentation
-- ✅ README updated
-- ✅ Architecture docs updated
-- ✅ Deprecation notes added
+### Final Verification:
+- [ ] All deprecated files removed
+- [ ] Application fully functional
+- [ ] No unused imports remain
+- [ ] Bundle size reduced as expected
+- [ ] Performance improved (if measurable)
 
 ---
 
-## Post-Refactoring Benefits
+## Estimated Time and Impact
 
-### Code Reduction
-- **Files Removed**: 5-7 files
-- **Lines of Code Removed**: ~150-200 lines
-- **Complexity Reduction**: Removed 2 unused services, 1 deprecated agent
+**Time Estimates:**
+- Phase 1 (Immediate deletions): 15 minutes
+- Phase 2 (Component cleanup): 1-2 hours
+- Phase 3 (Backend cleanup): 30 minutes
+- Phase 4 (Import cleanup): 30 minutes
+- Phase 5 (Testing): 1-2 hours
+- Phase 6 (Documentation): 30 minutes
 
-### Maintenance Benefits
-- Clearer codebase (no deprecated code)
-- Reduced confusion for new developers
-- Faster onboarding (fewer components to understand)
-- Reduced test surface area
+**Total Estimated Time:** 3.5-5.5 hours
 
-### Performance Benefits
-- Slightly faster startup (fewer services to initialize)
-- Reduced memory footprint (fewer unused objects)
+**Expected Impact:**
+- Code reduction: ~300-500 lines
+- Bundle size reduction: ~10-15KB
+- Build time improvement: ~5-10%
+- Maintenance improvement: Significant (removes dead code)
 
----
-
-## Conclusion
-
-This refactoring plan safely removes deprecated code while maintaining all active functionality. The phased approach allows for incremental testing and easy rollback if issues arise. The estimated time investment of 2.5-3.5 hours will result in a cleaner, more maintainable codebase.
+This refactoring plan provides a systematic, safe approach to removing deprecated code while minimizing risk to the application's functionality.

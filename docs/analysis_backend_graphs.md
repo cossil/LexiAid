@@ -1,346 +1,295 @@
-# Backend Graphs Analysis
+# Backend LangGraph Analysis
 
 ## Overview
-LangGraph-based AI agents for chat, quiz, and document understanding functionality. Uses state machines with checkpointing for conversation persistence.
+The backend uses LangGraph to implement a sophisticated agent architecture that handles different types of user interactions through specialized graphs. The system follows a supervisor pattern that routes requests to appropriate sub-graphs based on user intent and context.
 
-## File: `backend/graphs/new_chat_graph.py`
+## Graph Files
 
-### Purpose
-General chat/Q&A functionality with document context awareness.
+### 1. __init__.py
 
-### State: `GeneralQueryState`
-```python
-{
-    document_id: Optional[str]
-    user_id: Optional[str]
-    thread_id: Optional[str]
-    messages: List[BaseMessage]  # Full conversation history
-    query: str  # Latest user query
-    response: Optional[str]  # LLM response
-    error_message: Optional[str]
-}
-```
+**Purpose**: Package initialization file that marks the graphs directory as a Python sub-package.
 
-### Key Node: `call_chat_llm_node`
-- **Purpose**: Generate LLM response based on document and conversation history
-- **Process**:
-  1. Instantiates `ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)`
-  2. Loads document narrative via `DocumentRetrievalService`
-  3. Distills conversation history (last 5 messages)
-  4. Formats prompt with document narrative, history summary, and user query
-  5. Invokes LLM and returns response
-- **Document Handling**:
-  - If document_id present: Loads content from DocumentRetrievalService
-  - If no document: Uses placeholder "No document has been provided"
-  - Error handling: Returns user-friendly error message
+**Key Functions/Components**:
+- Simple package marker for Python module system
 
-### LLM Prompt Template
-```
-You are a helpful AI Tutor. Answer questions based *strictly and exclusively* on the provided Document Narrative. 
-If the answer is not in the document, state that the information is not available. 
-Do not use outside knowledge. Format response using simple Markdown.
-
-1. Document Narrative: {document_narrative}
-2. Conversation History: {distilled_conversation_summary}
-3. User's Question: {user_query}
-```
-
-### Helper: `distill_conversation_history`
-- **Purpose**: Summarize recent conversation for context
-- **Max Messages**: 5 (configurable)
-- **Format**: "User: ...\nAssistant: ..."
-
-### Graph Structure
-```
-Entry → call_chat_llm → END
-```
-
-### Factory Function
-```python
-create_new_chat_graph(checkpointer=None) -> CompiledGraph
-```
+**Inputs**: None
+**Outputs/Side Effects**: Enables importing from the graphs package
 
 ---
 
-## File: `backend/graphs/quiz_engine_graph.py`
+### 2. new_chat_graph.py
 
-### Purpose
-Interactive multiple-choice quiz generation and evaluation (V2).
+**Purpose**: Implements the general chat/Q&A functionality for document-based conversations using Google's Gemini AI model.
 
-### State: `QuizEngineState`
-```python
-{
-    document_id: str
-    document_content_snippet: str
-    user_id: str
-    max_questions: int
-    user_answer: Optional[str]
-    active_quiz_thread_id: str
-    quiz_history: List[Dict]  # Question/answer history
-    current_question_index: int
-    current_question_number: Optional[int]
-    score: int
-    llm_json_response: Optional[Dict]
-    llm_call_count: int
-    current_question_to_display: Optional[Dict]
-    current_feedback_to_display: Optional[str]
-    status: Literal["initializing", "generating_first_question", "awaiting_answer", 
-                    "evaluating_answer", "quiz_completed", "error"]
-    error_message: Optional[str]
-}
-```
+**Key Functions/Components**:
 
-### Pydantic Models
+#### State Definition
+- **GeneralQueryState**: TypedDict managing conversation state including document_id, user_id, thread_id, messages, query, response, and error handling
 
-#### `LLMQuestionDetail`
-```python
-{
-    question_text: str
-    options: List[str]  # 2-5 options
-    correct_answer_index: int  # 0-based
-    explanation_for_correct_answer: Optional[str]
-}
-```
+#### Core Node
+- **call_chat_llm_node()**: Main processing node that:
+  - Instantiates Gemini LLM client
+  - Retrieves document content via DocumentRetrievalService
+  - Performs conversation history distillation
+  - Formats prompts with document narrative and context
+  - Invokes LLM for response generation
+  - Handles errors gracefully
 
-#### `LLMQuizResponse`
-```python
-{
-    feedback_for_user: Optional[str]
-    is_correct: Optional[bool]
-    next_question: Optional[LLMQuestionDetail]
-    quiz_is_complete: bool
-    final_summary: Optional[str]  # Required if quiz_is_complete=true
-}
-```
+#### Helper Functions
+- **distill_conversation_history()**: Summarizes recent conversation messages for context
+- **create_new_chat_graph()**: Compiles the StateGraph with checkpointing support
 
-### Key Node: `call_quiz_engine_node`
-- **Purpose**: Generate questions or evaluate answers based on status
-- **Status Handling**:
-  - **generating_first_question**: Creates initial quiz question
-  - **evaluating_answer**: Evaluates user's answer + generates next question or concludes
-- **LLM Configuration**:
-  - Question generation: temperature=0.7
-  - Evaluation: temperature=0.3
-- **Process**:
-  1. Gets appropriate chain based on status
-  2. Invokes LLM with formatted prompt
-  3. Parses response using PydanticOutputParser
-  4. Updates quiz_history with results
-  5. Increments score if correct
-  6. Sets next status (awaiting_answer or quiz_completed)
+#### Prompt Template
+- Structured LLM prompt with document narrative, conversation history, and user query sections
+- Enforces strict adherence to document content (no external knowledge)
 
-### Prompts
+**Inputs**:
+- User queries and conversation history
+- Document IDs for context retrieval
+- Thread IDs for conversation persistence
 
-#### First Question Prompt
-- Inputs: document_content_snippet, max_questions, user_id
-- Output: JSON with first question (feedback/is_correct are null)
+**Outputs/Side Effects**:
+- Generated AI responses based on document content
+- Updated conversation state
+- Error handling for document retrieval failures
 
-#### Evaluate & Generate Next Prompt
-- Inputs: document_content, user_answer, previous question details, quiz history, score, progress
-- Output: JSON with feedback, is_correct, and either next_question or final_summary
-- **Completion Logic**: 
-  - If current_question_number >= max_questions → quiz_is_complete=true
-  - Requires comprehensive final_summary with score
-
-### Helper: `_format_quiz_history_for_prompt`
-- **Purpose**: Format answered questions for LLM context
-- **Format**: "Q1: {question}\n  User Answer: {answer}\n  Correct: {is_correct}\n  Feedback: {feedback}"
-
-### Graph Structure
-```
-Entry → quiz_engine_node → END
-```
-
-### Factory Function
-```python
-create_quiz_engine_graph(checkpointer: Optional[SqliteSaver] = None) -> CompiledGraph
-```
-
-### Model
-- **LLM**: gemini-2.5-flash
-- **Temperatures**: 0.7 (generation), 0.3 (evaluation)
+**Dependencies**: Google Generative AI (Gemini), DocumentRetrievalService, LangGraph
 
 ---
 
-## File: `backend/graphs/supervisor/graph.py`
+### 3. quiz_engine_graph.py
 
-### Purpose
-Orchestrates routing between specialized graphs (chat, quiz).
+**Purpose**: Advanced quiz generation and evaluation system that creates interactive assessments based on document content with comprehensive state management.
 
-### State: `SupervisorState` (from state.py)
-```python
-{
-    user_id: str
-    current_query: str
-    conversation_history: List[BaseMessage]
-    active_chat_thread_id: Optional[str]
-    active_dua_thread_id: Optional[str]
-    document_id_for_action: Optional[str]
-    document_snippet_for_quiz: Optional[str]
-    next_graph_to_invoke: Optional[Literal["quiz_engine_graph", "new_chat_graph", 
-                                            "document_understanding_graph", "end"]]
-    final_agent_response: Optional[str]
-    supervisor_error_message: Optional[str]
-    active_quiz_v2_thread_id: Optional[str]
-    quiz_engine_state: Optional[QuizEngineState]
-    is_quiz_v2_active: bool
-    current_audio_input_base64: Optional[str]
-    current_audio_format: Optional[str]
-    gcs_uri_for_action: Optional[str]
-    mime_type_for_action: Optional[str]
-    document_understanding_output: Optional[Dict]
-    document_understanding_error: Optional[str]
-}
-```
+**Key Functions/Components**:
 
-### Graph Nodes
+#### Pydantic Models
+- **LLMQuestionDetail**: Validates quiz question structure (text, options, correct answer, explanation)
+- **LLMQuizResponse**: Manages quiz responses (feedback, correctness, next question, completion status)
 
-#### From `nodes_routing.py`:
-1. **receive_user_input_node**: Processes incoming user query
-2. **routing_decision_node**: Determines which subgraph to invoke
-   - Detects quiz intent (e.g., "/start_quiz")
-   - Routes to appropriate graph
+#### State Definition
+- **QuizEngineState**: Comprehensive TypedDict tracking:
+  - Document information and content
+  - User and session identifiers
+  - Quiz progress (score, history, current question)
+  - Status tracking (initializing, generating, evaluating, completed, error)
+  - Display state (questions, feedback)
 
-#### From `nodes_invokers.py`:
-1. **invoke_new_chat_graph_node**: Calls new_chat_graph with mapped state
-2. **invoke_quiz_engine_graph_node**: Calls quiz_engine_graph with mapped state
+#### Core Node
+- **call_quiz_engine_node()**: Central processing that:
+  - Routes to appropriate prompt chains based on status
+  - Handles first question generation
+  - Manages answer evaluation and next question generation
+  - Updates quiz history and scoring
+  - Determines quiz completion
 
-### Graph Structure
-```
-Entry → receive_user_input → routing_decision → [conditional routing]
-                                                   ├→ new_chat_graph → END
-                                                   ├→ quiz_engine_graph → END
-                                                   └→ end → END
-```
+#### Prompt Templates
+- **PROMPT_GENERATE_FIRST_QUESTION**: Creates initial quiz questions
+- **PROMPT_EVALUATE_AND_GENERATE_NEXT**: Evaluates answers and generates subsequent questions or final summary
 
-### Routing Logic (`route_based_on_decision`)
-- **Default**: new_chat_graph
-- **Validation**: Ensures next_node is in valid_nodes list
-- **Fallback**: If quiz unavailable, routes to new_chat_graph
-- **Error Handling**: Critical errors force END with error message
+#### Helper Functions
+- **get_quiz_engine_chain()**: Creates appropriate LangChain chains based on status
+- **_format_quiz_history_for_prompt()**: Formats quiz history for LLM context
 
-### Factory Function
-```python
-create_supervisor_graph(
-    checkpointer: Optional[SqliteSaver] = None,
-    compiled_quiz_engine_graph_instance: Optional[Any] = None,
-    doc_retrieval_service: Optional[DocumentRetrievalService] = None
-) -> CompiledGraph
-```
+**Inputs**:
+- Document content snippets
+- User answers and quiz parameters
+- Quiz history and progress state
 
-### Initialization Process
-1. Instantiates new_chat_graph with checkpointer
-2. Uses provided quiz_engine_graph or creates new one
-3. Binds doc_retrieval_service to routing_decision_node via functools.partial
-4. Binds graph instances to invoker nodes via functools.partial
-5. Compiles with supervisor checkpointer
+**Outputs/Side Effects**:
+- Generated quiz questions with multiple choice options
+- Answer evaluation with detailed feedback
+- Progress tracking and scoring
+- Final quiz summaries and completion status
+
+**Dependencies**: Google Generative AI, Pydantic for validation, LangChain components
+
+---
+
+### 4. supervisor/ (Directory)
+
+#### 4.1 state.py
+
+**Purpose**: Defines the comprehensive state structure for the supervisor graph that orchestrates all sub-graph interactions.
+
+**Key Functions/Components**:
+- **SupervisorState**: Master TypedDict containing:
+  - User identification and current query
+  - Conversation history management
+  - Active thread IDs for different graph types
+  - Document and routing information
+  - Quiz engine state integration
+  - Audio input handling
+  - Document understanding state
+  - Error handling and final responses
+
+**Inputs**: State data from various sub-graphs and user inputs
+**Outputs/Side Effects**: Centralized state management for cross-graph coordination
+
+---
+
+#### 4.2 graph.py
+
+**Purpose**: Creates and configures the supervisor graph that routes user requests to appropriate specialized graphs.
+
+**Key Functions/Components**:
+- **create_supervisor_graph()**: Main graph construction function that:
+  - Instantiates sub-graphs (new_chat_graph, quiz_engine_graph)
+  - Adds routing and invoker nodes
+  - Configures conditional edges based on routing decisions
+  - Handles fallback scenarios for missing dependencies
+  - Compiles with checkpointing support
+
+#### Node Structure
+- **receive_user_input**: Entry point for user requests
+- **routing_decision**: Determines which specialized graph to invoke
+- **new_chat_graph**: Handles document-based Q&A
+- **quiz_engine_graph**: Manages quiz interactions
+
+#### Routing Logic
+- **route_based_on_decision()**: Conditional routing function that:
+  - Validates routing decisions
+  - Handles missing graph instances
+  - Provides fallback behavior
+  - Ensures valid node transitions
+
+**Inputs**: User queries, document context, routing decisions
+**Outputs/Side Effects**: Coordinated graph invocation and response aggregation
+
+**Dependencies**: LangGraph StateGraph, sub-graph instances, DocumentRetrievalService
+
+---
+
+#### 4.3 nodes_routing.py & nodes_invokers.py
+
+**Purpose**: Implement the routing logic and graph invocation mechanisms for the supervisor.
+
+**Key Functions/Components**:
+- **receive_user_input_node()**: Processes incoming user input and initial state setup
+- **routing_decision_node()**: Analyzes user intent to determine appropriate graph routing
+- **invoke_new_chat_graph_node()**: Manages chat graph invocation and response handling
+- **invoke_quiz_engine_graph_node()**: Handles quiz graph lifecycle management
+
+---
+
+#### 4.4 utils.py
+
+**Purpose**: Provides utility functions for supervisor operations including state management and message processing.
+
+---
+
+### 5. answer_formulation/ (Directory)
+
+#### 5.1 state.py
+
+**Purpose**: Defines state structure for the Answer Formulation workflow that helps students transform spoken thoughts into written answers.
+
+**Key Functions/Components**:
+- **AnswerFormulationState**: TypedDict tracking:
+  - User and session identification
+  - Original transcript and refined answer
+  - Edit commands and history
+  - Fidelity validation metrics
+  - Status progression through workflow
+  - Iteration and LLM call counters
+  - Timestamps for audit trails
+
+**Inputs**: Student transcripts, edit commands, validation results
+**Outputs/Side Effects**: Structured state for answer refinement workflow
+
+---
+
+#### 5.2 graph.py
+
+**Purpose**: Implements the Answer Formulation LangGraph workflow with nodes for validation, refinement, editing, and fidelity checking.
+
+**Key Functions/Components**:
+
+#### Core Nodes
+- **validate_input_node()**: Entry point validation:
+  - Checks transcript length (5-2000 words)
+  - Validates required fields (user_id, session_id)
+  - Initializes processing state
+  - Sets appropriate error states
+
+- **refine_answer_node()**: Core AI refinement:
+  - Uses Gemini with low temperature (0.3) for faithful refinement
+  - Transforms spoken thoughts into clear written answers
+  - Enforces constraint of not adding external information
+  - Updates iteration counters and timestamps
+
+- **apply_edit_node()**: Precise edit application:
+  - Parses user voice commands for edit intent
+  - Uses very low temperature (0.2) for minimal, precise changes
+  - Tracks edit history with before/after states
+  - Supports replacement, rephrasing, addition, deletion
+
+- **validate_fidelity_node()**: Quality control monitoring:
+  - Samples 10% of requests for cost efficiency
+  - Validates that refined answers contain only original transcript information
+  - Logs violations for developer monitoring
+  - Non-blocking (doesn't stop user workflow)
+
+#### Graph Construction
+- **create_answer_formulation_graph()**: Wires nodes with conditional routing:
+  - Routes to apply_edit for edit commands or validate_input for new refinements
+  - Includes fidelity validation after refinement and edits
+  - Supports checkpointing for session persistence
+
+**Inputs**: Student transcripts, edit commands, session parameters
+**Outputs/Side Effects**: Refined written answers, edit tracking, fidelity monitoring
+
+**Dependencies**: Google Generative AI, datetime utilities, random sampling, logging
+
+---
+
+#### 5.3 prompts.py
+
+**Purpose**: Contains system prompts for different stages of the answer formulation workflow.
+
+**Key Functions/Components**:
+- **REFINEMENT_SYSTEM_PROMPT**: Guides AI to refine without adding external information
+- **EDIT_SYSTEM_PROMPT**: Ensures precise, minimal edits based on user commands
+- **VALIDATION_PROMPT**: Structured prompt for fidelity checking and violation identification
+
+---
+
+#### 5.4 utils.py
+
+**Purpose**: Provides utility functions for edit command parsing and fidelity validation.
+
+**Key Functions/Components**:
+- **parse_edit_command()**: Analyzes user voice commands to determine edit type and parameters
+- **extract_fidelity_score()**: Parses LLM responses to extract numerical fidelity scores
+- **extract_violations()**: Identifies specific fidelity violations from validation responses
+
+---
+
+## LangGraph Architecture Patterns
+
+### State Management
+- **TypedDict Usage**: Strong typing for state structures across all graphs
+- **Checkpointing**: SQLite-based persistence for conversation and session state
+- **State Updates**: Incremental state updates through return dictionaries
+
+### Graph Composition
+- **Supervisor Pattern**: Central routing graph coordinating specialized sub-graphs
+- **Conditional Routing**: Dynamic graph selection based on user intent and context
+- **Node Specialization**: Single-purpose nodes with clear responsibilities
 
 ### Error Handling
-- Comprehensive try-except during graph setup
-- Fallback error graph if initialization fails
-- Placeholder nodes if subgraphs unavailable
+- **Graceful Degradation**: Fallback nodes and error states throughout
+- **Error Propagation**: Structured error messaging through state
+- **Recovery Mechanisms**: Retry logic and alternative routing paths
 
----
+### LLM Integration
+- **Temperature Control**: Different temperatures for different task types
+- **Prompt Engineering**: Structured prompts with clear constraints and examples
+- **Response Validation**: Pydantic models for structured response validation
 
-## File: `backend/graphs/document_understanding_agent/graph.py`
+### Performance Considerations
+- **Sampling Strategies**: 10% sampling for expensive validation operations
+- **Checkpoint Efficiency**: SQLite-based lightweight state persistence
+- **Graph Reuse**: Compiled graph instances cached and reused
 
-### Purpose
-Analyzes document structure and generates TTS-ready narratives for accessibility.
-
-### State: `DocumentUnderstandingState`
-```python
-{
-    document_id: str
-    input_file_path: str  # GCS URI
-    input_file_mimetype: str
-    tts_ready_narrative: Optional[str]
-    error_message: Optional[str]
-    processing_status: str
-}
-```
-
-### Key Function: `run_dua_processing_for_document`
-- **Purpose**: Async entry point for DUA processing
-- **Process**:
-  1. Validates input (document_id, file path, mimetype)
-  2. Loads image from GCS
-  3. Uploads to Vertex AI
-  4. Invokes Gemini 2.5 Flash with comprehensive prompt
-  5. Extracts TTS-ready narrative from response
-  6. Returns result dict with narrative or error
-
-### LLM Configuration
-- **Model**: gemini-2.5-flash-preview-05-20
-- **Temperature**: 0.3 (for deterministic output)
-- **Multimodal**: Accepts image + text prompt
-
-### Comprehensive LLM Prompt
-- **Critical Instructions**:
-  - Prioritize top-left image if present
-  - Follow top-to-bottom, column-wise reading order
-  - Extract verbatim text
-  - Describe visual elements (images, tables)
-  - Generate TTS-ready narrative
-- **Output Format**: Plain text narrative suitable for text-to-speech
-
-### Processing Flow
-```
-1. Validate inputs
-2. Load image from GCS (StorageService)
-3. Upload to Vertex AI (Part.from_data)
-4. Create multimodal prompt (image + text instructions)
-5. Invoke Gemini model
-6. Extract narrative from response
-7. Return {tts_ready_narrative: str} or {error_message: str}
-```
-
-### Error Handling
-- Validates required fields (document_id, file_path, mimetype)
-- Handles GCS download failures
-- Handles Vertex AI upload failures
-- Handles LLM invocation errors
-- Returns detailed error messages
-
-### Integration
-- Called directly from `document_routes.py` during document upload
-- Not part of supervisor graph (runs independently)
-- Results stored in Firestore as 'dua_narrative_content'
-
----
-
-## Summary
-
-### Graph Architecture
-```
-Supervisor Graph (Orchestrator)
-├── New Chat Graph (Q&A)
-│   └── Uses: DocumentRetrievalService, Gemini 2.5 Flash
-├── Quiz Engine Graph (V2)
-│   └── Uses: Gemini 2.5 Flash, Pydantic validation
-└── Document Understanding Agent (Independent)
-    └── Uses: Vertex AI, Gemini 2.5 Flash Preview, GCS
-```
-
-### State Persistence
-- **Checkpointers**: SQLite-based (SqliteSaver)
-- **Databases**:
-  - `quiz_checkpoints.db`
-  - `general_query_checkpoints.db`
-  - `supervisor_checkpoints.db`
-  - `document_understanding_checkpoints.db`
-- **Thread Management**: Each conversation has unique thread_id
-- **Quiz Sessions**: Separate thread_id for quiz state isolation
-
-### LLM Models Used
-1. **Gemini 2.5 Flash** (new_chat_graph, quiz_engine_graph)
-   - Temperature: 0.7 (generation), 0.3 (evaluation)
-2. **Gemini 2.5 Flash Preview 05-20** (document_understanding_agent)
-   - Temperature: 0.3 (deterministic)
-   - Multimodal capabilities
-
-### Key Design Patterns
-1. **Factory Functions**: All graphs use factory pattern for flexible instantiation
-2. **Functional Binding**: Uses functools.partial to inject dependencies
-3. **State Mapping**: Supervisor maps its state to subgraph states
-4. **Error Propagation**: Errors bubble up to supervisor for unified handling
-5. **Modular Architecture**: Each graph is independently testable
+This architecture provides a robust, scalable foundation for AI-powered educational features while maintaining clear separation of concerns and comprehensive error handling.

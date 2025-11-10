@@ -1,177 +1,184 @@
 # Frontend Main Analysis
 
-## File: `src/App.tsx`
+## Overview
+The frontend entry points provide the foundation for the LexiAid React application, with a focus on accessibility, routing, authentication, and context management. The application is built with modern React patterns using TypeScript, Tailwind CSS, and comprehensive accessibility features for students with learning disabilities.
 
-### Purpose
-Root React component managing routing, authentication, and global providers.
+## Frontend Entry Files
 
-### Key Components
+### 1. main.tsx
 
-#### `UserInteractionGateway` (Lines 26-91)
-- **Purpose**: Unblock browser audio features requiring user interaction
-- **Process**:
-  1. Shows modal prompting user to click
-  2. Initializes AudioContext with silent oscillator
-  3. Initializes SpeechSynthesis
-  4. Removes event listeners after interaction
-- **Events**: click, keydown, touchstart (once)
+**Purpose**: Application entry point that renders the React app into the DOM with React StrictMode enabled for development checks.
 
-#### `ProtectedRoute` (Lines 94-110)
-- **Purpose**: Route guard for authenticated pages
-- **Logic**: 
-  - Shows loader while auth loading
-  - Redirects to `/auth/signin` if not authenticated
-  - Renders children if authenticated
+**Key Functions/Components**:
+- **ReactDOM.createRoot()**: Creates root DOM node for React 18+ concurrent rendering
+- **root.render()**: Renders the main App component wrapped in React.StrictMode
+- **StrictMode**: Enables development-time checks for potential issues and warnings
 
-#### `AppRoutes` (Lines 113-168)
-- **Purpose**: Defines application routing structure
-- **Public Routes**:
-  - `/` → LandingPage
-  - `/auth/signin` → SignIn
-  - `/auth/signup` → SignUp
-  - `/auth/reset-password` → ResetPassword
-- **Protected Routes** (under `/dashboard`):
-  - `/dashboard` → Dashboard (index)
-  - `/dashboard/upload` → DocumentUpload
-  - `/dashboard/documents` → DocumentsList
-  - `/dashboard/documents/:id` → DocumentView
-  - `/dashboard/chat` → ChatPage
-  - `/dashboard/settings` → Settings
-- **Dev Routes**: `/dev/deprecation-showcase` (DEV mode only)
+**Inputs**: None (entry point)
+**Outputs/Side Effects**: 
+- Initializes the React application
+- Enables development-time safety checks
+- Mounts the app to the DOM element with id 'root'
 
-#### `App` Component (Lines 170-194)
-- **State**: `userHasInteracted` (tracks audio unlock)
-- **Provider Hierarchy**:
-  ```
-  Router
-    └── AuthProvider
-        └── AccessibilityProvider
-            └── UserInteractionGateway (conditional)
-            └── AppRoutes
-  ```
-- **Context Wrapping**: DocumentProvider and QuizProvider wrap DashboardLayout
-
-### Routing Structure
-```
-/ (public)
-/auth/* (public)
-/dashboard (protected)
-  ├── DocumentProvider
-  │   └── QuizProvider
-  │       └── DashboardLayout
-  │           ├── / (Dashboard)
-  │           ├── /upload (DocumentUpload)
-  │           ├── /documents (DocumentsList)
-  │           ├── /documents/:id (DocumentView)
-  │           ├── /chat (ChatPage)
-  │           └── /settings (Settings)
-```
-
-### Key Features
-- **Audio Initialization**: Ensures TTS/STT work by requiring user interaction
-- **Lazy Loading**: Dev components loaded dynamically
-- **Nested Providers**: Context available to all protected routes
-- **Fallback Routing**: Unknown routes redirect appropriately
+**Dependencies**: React, ReactDOM, App component
 
 ---
 
-## File: `src/main.tsx`
+### 2. App.tsx
 
-### Purpose
-Application entry point and React rendering.
+**Purpose**: Main React application component that establishes routing, authentication, accessibility contexts, and provides the overall application structure.
 
-### Code
-```typescript
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
+**Key Functions/Components**:
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+#### Routing Configuration
+- **BrowserRouter**: Client-side routing using React Router DOM
+- **Route Definitions**: Comprehensive route structure with public and protected routes
+- **ProtectedRoute**: Authentication wrapper for dashboard and protected features
+- **Nested Routes**: Dashboard layout with child routes for different features
+
+#### Route Structure
+```
+Public Routes:
+- / → LandingPage
+- /auth/signin → SignIn
+- /auth/signup → SignUp
+- /auth/forgot-password → ForgotPassword
+
+Protected Routes (under /dashboard):
+- /dashboard → Dashboard (index)
+- /dashboard/chat → ChatPage
+- /dashboard/documents → DocumentUpload
+- /dashboard/quiz → QuizPage
+- /dashboard/answer-formulation → AnswerFormulationPage
+- /dashboard/profile → ProfilePage
+- /dashboard/progress → ProgressPage
 ```
 
-### Configuration
-- **Strict Mode**: Enabled for development checks
-- **Root Element**: `#root` in index.html
-- **Styling**: Imports global index.css (Tailwind)
+#### Context Providers
+- **AuthContext**: Firebase authentication state management
+- **AccessibilityContext**: Accessibility preferences and settings
+- **DocumentContext**: Document selection and management state
+- **QuizContext**: Quiz session and progress tracking
+
+#### Accessibility Features
+- **UserInteractionGateway**: Audio unblocking handler for browser autoplay policies
+- **Skip Navigation**: Keyboard navigation support for screen readers
+- **Focus Management**: Proper focus handling throughout the application
+
+**Inputs**: 
+- Route parameters and navigation state
+- User authentication status
+- Accessibility preferences
+
+**Outputs/Side Effects**:
+- Renders appropriate page components based on routes
+- Manages global application state through contexts
+- Handles authentication redirects and protected route access
+- Provides accessibility features and user interaction handling
+
+**Dependencies**: 
+- React Router DOM for navigation
+- Context providers for state management
+- Page components for different application sections
+- Accessibility utilities and components
 
 ---
 
-## File: `src/firebase/config.ts`
+### 3. index.css
 
-### Purpose
-Firebase SDK initialization and configuration.
+**Purpose**: Global stylesheet providing Tailwind CSS integration, accessibility-focused custom styles, and dyslexia-friendly font support.
 
-### Exports
-```typescript
-export const app: FirebaseApp
-export const auth: Auth
-export const db: Firestore
-```
+**Key Functions/Components**:
 
-### Configuration Source
-- Environment variables via `import.meta.env`:
-  - `VITE_FIREBASE_API_KEY`
-  - `VITE_FIREBASE_AUTH_DOMAIN`
-  - `VITE_FIREBASE_PROJECT_ID`
-  - `VITE_FIREBASE_STORAGE_BUCKET`
-  - `VITE_FIREBASE_MESSAGING_SENDER_ID`
-  - `VITE_FIREBASE_APP_ID`
+#### Tailwind CSS Integration
+- **@tailwind directives**: Imports base, components, and utilities styles
+- **CSS Custom Properties**: Defines design tokens for theming
+- **Responsive Design**: Mobile-first approach with Tailwind utilities
 
-### Services Initialized
-1. **Firebase App**: Core Firebase instance
-2. **Auth**: Firebase Authentication
-3. **Firestore**: Cloud Firestore database
+#### Accessibility Features
+- **OpenDyslexic Font**: Custom font-face declarations for dyslexia-friendly reading
+- **Font Display Strategy**: swap for better loading performance
+- **Focus Styles**: Enhanced focus indicators for keyboard navigation
+- **Touch Targets**: Minimum 44px sizing for interactive elements
 
----
+#### High Contrast Mode
+- **CSS Variables**: Custom properties for high contrast theming
+- **Override Styles**: Important declarations for contrast mode
+- **Component Styling**: Specific overrides for buttons, inputs, and backgrounds
 
-## File: `src/index.css`
+#### Navigation Aids
+- **Skip Links**: Keyboard navigation shortcuts for screen readers
+- **Focus Management**: Visible focus indicators with proper offset
+- **Color Contrast**: Blue focus indicators meeting WCAG standards
 
-### Purpose
-Global styles and Tailwind CSS configuration.
+#### Custom Components
+- **Scrollbar Styling**: Custom scrollbar for better visibility
+- **Text Highlighting**: Semi-transparent highlighting for text emphasis
+- **Smooth Transitions**: Subtle animations for better UX
 
-### Key Features
-- **Tailwind Directives**: @tailwind base, components, utilities
-- **Custom Fonts**: OpenDyslexic font-face definitions
-- **Dark Mode**: Configured via Tailwind's dark: prefix
-- **Accessibility**: High contrast mode support
-- **Custom Properties**: CSS variables for theming
+**Inputs**: None (global stylesheet)
+**Outputs/Side Effects**:
+- Applies global styling to the entire application
+- Enables accessibility features through CSS classes
+- Provides responsive design foundation
+- Supports dyslexia-friendly reading experience
 
-### Font Loading
-```css
-@font-face {
-  font-family: 'OpenDyslexic';
-  src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-}
-```
+**Dependencies**: 
+- Tailwind CSS framework
+- OpenDyslexic font from CDN
+- Custom CSS properties and utilities
 
 ---
 
-## Summary
+### 4. vite-env.d.ts
 
-### Application Flow
-1. **Entry**: main.tsx renders App component
-2. **Initialization**: Firebase config loaded
-3. **Audio Unlock**: UserInteractionGateway ensures browser audio works
-4. **Authentication**: AuthProvider manages user state
-5. **Accessibility**: AccessibilityProvider manages TTS/visual settings
-6. **Routing**: React Router handles navigation
-7. **Protected Access**: ProtectedRoute guards dashboard routes
-8. **Context Injection**: DocumentProvider & QuizProvider for dashboard
+**Purpose**: TypeScript environment declaration file for Vite build tool integration.
 
-### Environment Variables Required
-- Firebase config (6 variables)
-- `VITE_BACKEND_API_URL` (for API calls)
+**Key Functions/Components**:
+- **Type Reference**: Includes Vite client type definitions
+- **Environment Types**: Provides TypeScript support for Vite-specific features
+- **Import Types**: Enables proper type checking for Vite modules
 
-### Key Design Patterns
-1. **Provider Pattern**: Nested context providers for global state
-2. **Route Guards**: ProtectedRoute HOC for auth
-3. **Lazy Loading**: Dynamic imports for dev components
-4. **Audio Initialization**: User interaction gateway for browser compliance
-5. **Strict Mode**: Development-time checks enabled
+**Inputs**: None (type declaration)
+**Outputs/Side Effects**:
+- Enables TypeScript support for Vite features
+- Provides type definitions for development environment
+- Supports hot module replacement types
+
+**Dependencies**: Vite type definitions
+
+---
+
+## Frontend Architecture Patterns
+
+### Component Organization
+- **Hierarchical Structure**: Clear parent-child relationships between components
+- **Route-Based Splitting**: Components organized by application routes
+- **Context Integration**: Global state managed through React contexts
+- **Accessibility First**: All components built with accessibility considerations
+
+### State Management
+- **Context API**: Centralized state for authentication, documents, and user preferences
+- **Local State**: Component-specific state using React hooks
+- **Routing State**: URL-based state management for navigation
+- **Accessibility State**: Persistent accessibility preferences
+
+### Accessibility Implementation
+- **WCAG Compliance**: Follows Web Content Accessibility Guidelines
+- **Screen Reader Support**: Proper ARIA labels and semantic HTML
+- **Keyboard Navigation**: Full keyboard accessibility with focus management
+- **Visual Accessibility**: High contrast modes and dyslexia-friendly fonts
+
+### Performance Considerations
+- **Code Splitting**: Route-based lazy loading for better performance
+- **Font Optimization**: Strategic font loading with display swap
+- **CSS Optimization**: Tailwind's purging and optimization features
+- **React StrictMode**: Development-time performance and safety checks
+
+### Development Experience
+- **TypeScript**: Type safety throughout the application
+- **Hot Module Replacement**: Fast development iteration
+- **Component Composition**: Reusable component patterns
+- **Error Boundaries**: Graceful error handling and recovery
+
+This frontend architecture provides a robust, accessible, and maintainable foundation for the LexiAid application, with special attention to the needs of students with learning disabilities through comprehensive accessibility features and thoughtful design patterns.

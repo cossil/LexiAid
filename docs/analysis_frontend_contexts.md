@@ -1,254 +1,232 @@
 # Frontend Contexts Analysis
 
-## File: `src/contexts/AuthContext.tsx`
+## Overview
+The frontend React contexts provide centralized state management for cross-cutting concerns including authentication, accessibility preferences, document selection, and quiz session management. These contexts enable efficient data sharing and state synchronization across the application component tree.
 
-### Purpose
-Manage Firebase authentication state and user preferences.
+## Context Components
 
-### State
-- `currentUser`: Firebase User | null
-- `loading`: boolean (auth initialization)
-- `userPreferences`: Object with accessibility/UI settings
+### 1. AuthContext.tsx
 
-### User Preferences Structure
-```typescript
-{
-  fontSize: number
-  fontFamily: string
-  lineSpacing: number
-  wordSpacing: number
-  textColor: string
-  backgroundColor: string
-  highContrast: boolean
-  uiTtsEnabled: boolean
-  cloudTtsEnabled: boolean
-  ttsVoice: string
-  ttsSpeed: number
-  ttsPitch: number
-  ttsDelay: TtsDelayOption
-}
-```
+**Purpose**: Comprehensive authentication context managing user sessions, Firebase authentication, and user preferences with persistent storage and token management.
 
-### Key Functions
+**Key Functions/Components**:
 
-#### `updateUserPreferences(updates)`
-- **Purpose**: Update user preferences in Firestore
-- **Process**:
-  1. Merges updates with current preferences
-  2. Calls `/api/users/me/preferences` (PUT)
-  3. Updates local state
-- **Optimistic Update**: UI updates immediately
+#### Authentication Management
+- **Firebase Integration**: Complete Firebase Authentication integration with email/password and Google OAuth
+- **Session Management**: Real-time authentication state tracking with onAuthStateChanged
+- **Token Management**: ID token generation and refresh for backend API authentication
+- **User Profile**: User profile data management and updates
 
-#### `getAuthToken()`
-- **Purpose**: Get current user's Firebase ID token
-- **Returns**: Promise<string | null>
-- **Used By**: API service for authentication
+#### User Preferences
+- **Default Preferences**: Comprehensive default accessibility preferences for new users
+- **Preference Persistence**: Automatic synchronization with Firestore for user preferences
+- **Preference Updates**: Partial preference updates with immediate UI reflection
+- **Type Safety**: Full TypeScript interface for all preference properties
 
-### Firebase Auth Listeners
-- `onAuthStateChanged`: Updates currentUser on auth changes
-- Loads user preferences from Firestore on login
-- Clears preferences on logout
+#### Authentication Operations
+- **Sign In**: Email/password authentication with error handling
+- **Sign Up**: User registration with profile creation and preference initialization
+- **Google Sign-In**: OAuth integration for quick authentication
+- **Sign Out**: Complete session cleanup and state reset
+- **Password Reset**: Email-based password reset functionality
 
-### Provider Value
-```typescript
-{
-  currentUser
-  loading
-  userPreferences
-  updateUserPreferences
-  getAuthToken
-}
-```
+#### Advanced Features
+- **Answer Formulation Settings**: Preferences for auto-pause, session tracking, and onboarding
+- **TTS Configuration**: Voice, speed, pitch, and delay settings
+- **Visual Accessibility**: Font, spacing, contrast, and color preferences
+- **Token Refresh**: Automatic token refresh for API calls
+
+**Inputs**:
+- Firebase authentication events
+- User preference updates
+- Authentication method selections
+- Profile modification requests
+
+**Outputs/Side Effects**:
+- User authentication state changes
+- Firestore preference synchronization
+- ID token generation and refresh
+- User profile updates
+
+**Dependencies**: 
+- Firebase Authentication SDK
+- Firebase Firestore for preferences
+- React Context API
+- TypeScript interfaces
 
 ---
 
-## File: `src/contexts/AccessibilityContext.tsx`
+### 2. AccessibilityContext.tsx
 
-### Purpose
-Manage accessibility features, TTS, and visual preferences.
+**Purpose**: Advanced accessibility context providing text-to-speech functionality, visual accessibility controls, and real-time preference synchronization with user experience optimization.
 
-### State
-- `uiTtsEnabled`: boolean - Hover-to-speak
-- `highContrast`: boolean - High contrast mode
-- `fontSize`, `fontFamily`, `lineSpacing`, `wordSpacing`: Visual settings
-- `cloudTtsEnabled`: boolean - Use Google Cloud TTS vs browser TTS
-- `ttsDelay`: TtsDelayOption - Delay before speaking (0, 500, 1000, 1500ms)
-- `isSpeaking`: boolean - TTS playback status
-- `ttsLoading`: boolean - TTS synthesis in progress
-- `audioProgress`: number - Playback progress
+**Key Functions/Components**:
 
-### Key Functions
+#### Text-to-Speech System
+- **Dual TTS Support**: Both basic browser TTS and cloud-based TTS options
+- **Speech Synthesis**: Intelligent text-to-speech with delay configuration
+- **Long Text Handling**: Chunked processing for long content with progress tracking
+- **Audio Management**: Proper audio element lifecycle and cleanup
 
-#### `speakText(text, options)`
-- **Purpose**: Speak text with configurable delay and TTS method
-- **Options**:
-  - `forcePremium`: Force Google Cloud TTS
-  - `forceBasic`: Force browser TTS
-  - `isDocumentContent`: Prefer premium for documents
-  - `ignoreDelay`: Skip delay
-- **Delay Logic**:
-  - If delay > 0: Schedules speech with setTimeout
-  - Clears previous timer to prevent overlapping
-  - Executes immediately if delay = 0 or ignoreDelay = true
+#### Visual Accessibility
+- **High Contrast Mode**: Toggle for high contrast visual themes
+- **Typography Controls**: Font size, family, line spacing, and word spacing
+- **Real-time Updates**: Immediate visual feedback for preference changes
+- **CSS Integration**: Dynamic CSS class application for accessibility features
 
-#### `executeSpeech(text, options)`
-- **Purpose**: Actual TTS execution after delay
-- **TTS Selection**:
-  1. Check `forcePremium` or `forceBasic` options
-  2. If `cloudTtsEnabled` and `isDocumentContent`: Use Cloud TTS
-  3. Else: Use browser SpeechSynthesis
-- **Cloud TTS**:
-  - Calls `/api/tts/synthesize`
-  - Plays base64 audio
-  - Tracks progress
-- **Browser TTS**:
-  - Uses SpeechSynthesisUtterance
-  - Applies voice, rate, pitch settings
+#### TTS Configuration
+- **Delay Options**: Configurable delay before TTS activation (Off, Short, Medium, Long)
+- **Voice Settings**: Voice selection, speed, and pitch controls
+- **Cloud TTS**: Premium cloud-based TTS with fallback to browser TTS
+- **Progress Tracking**: Real-time audio playback progress monitoring
 
-#### `speakLongText(text)`
-- **Purpose**: Speak long text with chunking
-- **Process**:
-  - Splits text into sentences
-  - Queues utterances
-  - Manages playback state
+#### State Management
+- **Preference Sync**: Automatic synchronization with Auth context preferences
+- **Local State**: Fast local state updates for responsive UI
+- **Persistence**: Backend preference storage through Auth context
+- **Error Handling**: Comprehensive error handling for TTS failures
 
-#### `cancelSpeech()`
-- **Purpose**: Stop all TTS playback
-- **Actions**:
-  - Stops audio playback
-  - Cancels browser synthesis
-  - Clears timers
-  - Resets state
+**Inputs**:
+- User preference changes from Auth context
+- TTS trigger requests from components
+- Visual accessibility toggle requests
+- Audio control interactions
 
-### Toggle Functions
-- `toggleUiTts()`: Enable/disable hover-to-speak
-- `toggleHighContrast()`: Toggle high contrast mode
-- `toggleCloudTts()`: Switch between Cloud and browser TTS
+**Outputs/Side Effects**:
+- Audio playback and synthesis
+- Visual theme and typography updates
+- Preference synchronization with backend
+- Speech cancellation and progress tracking
 
-### Sync with AuthContext
-- Reads initial values from `userPreferences`
-- Updates persist via `updateUserPreferences`
-- useEffect syncs state when preferences change
-
-### Provider Value
-```typescript
-{
-  uiTtsEnabled, toggleUiTts
-  highContrast, toggleHighContrast
-  fontSize, setFontSize
-  fontFamily, setFontFamily
-  lineSpacing, setLineSpacing
-  wordSpacing, setWordSpacing
-  cloudTtsEnabled, toggleCloudTts
-  ttsDelay, setTtsDelay
-  speakText, speakLongText, cancelSpeech
-  isSpeaking, ttsLoading, audioProgress
-}
-```
+**Dependencies**: 
+- Auth context for preference management
+- TTS utilities for speech synthesis
+- React Context API and hooks
+- HTML5 Audio API
 
 ---
 
-## File: `src/contexts/DocumentContext.tsx`
+### 3. DocumentContext.tsx
 
-### Purpose
-Manage globally active document ID for navigation and context.
+**Purpose**: Lightweight document context managing the currently active document selection across the application with efficient state updates and component synchronization.
 
-### State
-- `activeDocumentId`: string | null
+**Key Functions/Components**:
 
-### Key Functions
-- `setActiveDocumentId(id)`: Update active document
+#### Document Selection
+- **Active Document Tracking**: Maintains currently selected document ID
+- **State Updates**: Efficient document selection and deselection
+- **Component Synchronization**: Automatic updates across all consuming components
+- **Memory Optimization**: useMemo optimization to prevent unnecessary re-renders
 
-### Use Cases
-1. **DocumentView**: Sets active document on mount
-2. **DashboardLayout**: Sidebar "Chat with document" link uses active ID
-3. **Navigation**: Ensures chat/quiz have document context
+#### Context Interface
+- **Simple API**: Clean, minimal interface for document management
+- **Type Safety**: Full TypeScript support with proper interfaces
+- **Error Handling**: Proper error handling for context usage outside provider
+- **Custom Hook**: Convenient useDocument hook for component consumption
 
-### Provider Value
-```typescript
-{
-  activeDocumentId
-  setActiveDocumentId
-}
-```
+#### Performance Features
+- **Memoization**: Optimized value object to prevent re-renders
+- **Lightweight**: Minimal overhead for simple document tracking
+- **Reactive**: Immediate updates across all consuming components
+- **Scalable**: Foundation for future document management features
 
-### Integration
-- Wrapped in App.tsx around DashboardLayout
-- Available to all dashboard pages
+**Inputs**:
+- Document selection requests
+- Document deselection requests
+- Component mount/unmount events
 
----
+**Outputs/Side Effects**:
+- Active document state updates
+- Component re-rendering on document changes
+- Context value updates for consumers
 
-## File: `src/contexts/QuizContext.tsx`
-
-### Purpose
-Manage quiz state across components.
-
-### State
-- `isQuizActive`: boolean
-- `quizThreadId`: string | null
-- `currentQuestionIndex`: number
-- `score`: number
-
-### Key Functions
-- `startQuiz(threadId)`: Initialize quiz
-- `endQuiz()`: Cleanup quiz state
-- `updateScore(points)`: Update score
-
-### Provider Value
-```typescript
-{
-  isQuizActive
-  quizThreadId
-  currentQuestionIndex
-  score
-  startQuiz
-  endQuiz
-  updateScore
-}
-```
-
-### Integration
-- Wrapped in App.tsx around DashboardLayout
-- Used by ChatPage for quiz management
+**Dependencies**: 
+- React Context API
+- React hooks (useState, useContext, useMemo)
+- TypeScript interfaces
 
 ---
 
-## Summary
+### 4. QuizContext.tsx
 
-### Context Hierarchy
-```
-App
-└── AuthProvider (authentication + preferences)
-    └── AccessibilityProvider (TTS + visual settings)
-        └── Router
-            └── DashboardLayout
-                └── DocumentProvider (active document)
-                    └── QuizProvider (quiz state)
-                        └── Dashboard Pages
-```
+**Purpose**: Quiz session management context handling quiz thread tracking, session cancellation, and integration with backend quiz services for proper lifecycle management.
 
-### Data Flow
-1. **Auth**: Firebase → AuthContext → AccessibilityContext
-2. **Preferences**: Firestore → AuthContext → AccessibilityContext → UI
-3. **Document**: DocumentView → DocumentContext → DashboardLayout sidebar
-4. **Quiz**: ChatPage → QuizContext → UI state
+**Key Functions/Components**:
 
-### Persistence
-- **AuthContext**: Firestore `/users/{uid}/preferences`
-- **AccessibilityContext**: Synced with AuthContext preferences
-- **DocumentContext**: Session-only (not persisted)
-- **QuizContext**: Session-only (thread-based persistence via backend)
+#### Session Management
+- **Thread Tracking**: Maintains active quiz thread ID for session management
+- **Session Lifecycle**: Handles quiz session start and cancellation
+- **Backend Integration**: Communicates with backend quiz API for session control
+- **State Synchronization**: Real-time updates across quiz-related components
 
-### Key Features
-1. **Centralized Auth**: Single source of truth for user state
-2. **Preference Sync**: Auto-sync between contexts and Firestore
-3. **TTS Flexibility**: Dual TTS modes (Cloud vs Browser)
-4. **Delay Control**: Configurable hover-to-speak delay
-5. **Global Document**: Active document accessible anywhere
-6. **Quiz State**: Shared quiz state across chat components
+#### API Integration
+- **Quiz Cancellation**: Backend API calls for proper session termination
+- **Error Handling**: Comprehensive error handling for API failures
+- **Loading States**: Loading indicators for cancellation operations
+- **Toast Notifications**: User feedback for session actions
 
-### Performance Optimizations
-- `useMemo`: Prevents unnecessary re-renders
-- Debounced updates: TTS delay prevents rapid-fire speech
-- Optimistic updates: UI updates before API confirmation
-- Cleanup: Proper cleanup of timers and audio resources
+#### User Experience
+- **Status Feedback**: Clear indication of active quiz sessions
+- **Cancellation Flow**: User-friendly quiz cancellation process
+- **Error Recovery**: Graceful handling of cancellation failures
+- **Component Coordination**: Coordinates quiz state across multiple components
+
+#### Performance Features
+- **Callback Optimization**: useCallback for efficient function references
+- **Conditional API Calls**: Prevents unnecessary API calls when no session exists
+- **State Efficiency**: Minimal state overhead for session tracking
+- **Error Boundaries**: Proper error handling prevents component crashes
+
+**Inputs**:
+- Quiz session start requests
+- Quiz cancellation requests
+- Backend API responses
+- User interaction events
+
+**Outputs/Side Effects**:
+- Quiz thread ID state updates
+- Backend API calls for session management
+- User notifications and feedback
+- Component state synchronization
+
+**Dependencies**: 
+- API service for backend communication
+- React Context API and hooks
+- Toast notification system
+- TypeScript interfaces
+
+---
+
+## Context Architecture Patterns
+
+### Design Principles
+- **Single Responsibility**: Each context handles one specific domain of concern
+- **Separation of Concerns**: Clear boundaries between different context types
+- **Performance Optimization**: Efficient updates and minimal re-renders
+- **Type Safety**: Comprehensive TypeScript support throughout
+
+### State Management
+- **Centralized State**: Global state managed through context providers
+- **Local Optimization**: Smart use of local state for responsive updates
+- **Persistence Integration**: Backend synchronization for user preferences
+- **Reactive Updates**: Automatic updates across consuming components
+
+### Integration Patterns
+- **Context Composition**: Contexts work together without tight coupling
+- **Provider Hierarchy**: Logical provider nesting for dependency management
+- **Hook-Based Access**: Custom hooks for clean context consumption
+- **Error Boundaries**: Proper error handling for context usage
+
+### Performance Optimization
+- **Memoization**: Strategic use of useMemo to prevent unnecessary re-renders
+- **Callback Optimization**: useCallback for stable function references
+- **Selective Updates**: Targeted state updates to minimize re-renders
+- **Lazy Loading**: Efficient initialization and resource management
+
+### Accessibility Features
+- **WCAG Compliance**: Built-in accessibility support throughout contexts
+- **Screen Reader Support**: Proper ARIA integration and announcements
+- **Keyboard Navigation**: Full keyboard accessibility support
+- **Visual Accessibility**: Comprehensive visual accessibility controls
+
+This context architecture provides a robust, scalable, and maintainable foundation for the LexiAid application's global state management, with special attention to accessibility requirements and performance optimization throughout the application.
