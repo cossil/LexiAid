@@ -31,7 +31,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements file
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies into the virtual environment
 RUN pip install --upgrade pip setuptools wheel && \

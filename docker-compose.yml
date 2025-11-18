@@ -7,7 +7,7 @@ services:
 
   ## --------------------------- BACKEND --------------------------- ##
   backend:
-    image: lexiaid-backend:latest
+    image: cossil/lexiaid-backend:latest
     build:
       context: .
       dockerfile: ./backend/Dockerfile
@@ -33,6 +33,7 @@ services:
           cpus: "0.5"
           memory: 512M
       labels:
+        # --- Traefik Labels ---
         - "traefik.enable=true"
         - "traefik.http.routers.lexiaid_backend.rule=Host(`api.hankell.com.br`)"
         - "traefik.http.routers.lexiaid_backend.entrypoints=websecure"
@@ -41,9 +42,21 @@ services:
         - "traefik.http.routers.lexiaid_backend.service=lexiaid_backend"
         - "traefik.http.services.lexiaid_backend.loadbalancer.server.port=5000"
         - "traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=true"
+        
+        # --- CORS Middleware Labels ---
+        - "traefik.http.middlewares.lexiaid-cors.headers.accessControlAllowMethods=GET,POST,PUT,DELETE,OPTIONS"
+        - "traefik.http.middlewares.lexiaid-cors.headers.accessControlAllowOriginList=https://lexiaid.hankell.com.br"
+        - "traefik.http.middlewares.lexiaid-cors.headers.accessControlAllowHeaders=Content-Type,Authorization"
+        - "traefik.http.middlewares.lexiaid-cors.headers.accessControlAllowCredentials=true"
+        - "traefik.http.middlewares.lexiaid-cors.headers.addVaryHeader=true"
+        
+        # --- Apply the CORS middleware to the router ---
+        - "traefik.http.routers.lexiaid_backend.middlewares=lexiaid-cors@docker"
+
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      # Use the correct /api/health path
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/api/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -51,7 +64,7 @@ services:
 
   ## --------------------------- FRONTEND --------------------------- ##
   frontend:
-    image: lexiaid-frontend:latest
+    image: cossil/lexiaid-frontend:latest
     build:
       context: .
       dockerfile: ./Dockerfile

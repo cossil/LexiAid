@@ -8,6 +8,7 @@ from google.cloud import speech
 import base64
 
 from backend.graphs.supervisor.state import SupervisorState
+from backend.utils.message_utils import serialize_messages
 from backend.graphs.supervisor.utils import (
     is_cancel_query,
     is_document_understanding_query,
@@ -140,6 +141,11 @@ def receive_user_input_node(state: SupervisorState) -> dict[str, Any]:
         updates["document_snippet_for_quiz"] = None # Clear stale snippet if not going to quiz
 
     print(f"[Supervisor] User input processed. Query: '{updates['current_query'][:100]}...', Tentative next_graph: {updates['next_graph_to_invoke']}")
+    
+    # --- Safety serialization for all message states before checkpoint ---
+    if "conversation_history" in updates:
+        updates["conversation_history"] = serialize_messages(updates["conversation_history"])
+    
     return updates
 
 def routing_decision_node(state: SupervisorState, doc_retrieval_service: Optional[DocumentRetrievalService]) -> dict[str, Any]:
@@ -260,4 +266,9 @@ def routing_decision_node(state: SupervisorState, doc_retrieval_service: Optiona
         updates["active_quiz_v2_thread_id"] = None
 
     print(f"[Supervisor] Final routing decision: {updates['next_graph_to_invoke']}")
+    
+    # --- Safety serialization for all message states before checkpoint ---
+    if "conversation_history" in updates:
+        updates["conversation_history"] = serialize_messages(updates["conversation_history"])
+    
     return updates

@@ -1,143 +1,69 @@
-# Frontend Services Analysis
+# **Analysis: Frontend Services Layer**
 
-## Overview
-The frontend services provide a centralized API communication layer that handles all backend interactions, authentication, data transformation, and error handling. The service layer abstracts away the complexity of HTTP requests and provides a clean, type-safe interface for the rest of the application.
+Document Version: 2.0 (Converged)  
+Status: Final Audit
 
-## Service Components
+## **1\. Overview**
 
-### 1. api.ts
+This document provides a complete analysis of the frontend's service layer, centralized primarily in src/services/api.ts. This module acts as the gateway for all communication with the backend, handling authentication, HTTP request configuration, and API method definitions.
 
-**Purpose**: Comprehensive API service providing centralized communication with the LexiAid backend, including authentication, document management, chat functionality, and specialized features like answer formulation.
+The current implementation contains a mix of architectural patterns. While it establishes a good foundation with a shared **Axios instance** and **Authentication Interceptors**, it suffers from inconsistent implementation details (mixing fetch and axios) and brittle coupling (hardcoded query strings) that require remediation.
 
-**Key Functions/Components**:
+## **2\. Consolidated Recommendations (Action Plan)**
 
-#### Core Infrastructure
-- **Axios Instance**: Configured HTTP client with base URL and default headers
-- **Authentication Interceptor**: Automatic token injection for all API requests
-- **Error Handling**: Centralized error handling and response transformation
-- **Type Safety**: Full TypeScript interfaces for all API requests and responses
+This audit identified specific tech debt and architectural risks that should be addressed to improve stability and maintainability.
 
-#### Authentication & Token Management
-- **Token Injection**: Automatic Bearer token attachment to all requests
-- **Token Refresh**: ID token generation and refresh functionality
-- **Error Recovery**: Graceful handling of token failures and authentication errors
-- **User Context**: Integration with Firebase Authentication for user management
-
-#### Chat & AI Services
-- **Chat API**: Core chat functionality with document context and thread management
-- **Audio Upload**: Support for both review and direct send audio processing modes
-- **Quiz Management**: Quiz session creation, continuation, and cancellation
-- **Response Mapping**: Intelligent mapping between backend and frontend response formats
-
-#### Document Management
-- **Document CRUD**: Complete create, read, update, delete operations for documents
-- **File Upload**: Multipart form data upload with metadata support
-- **Content Retrieval**: Document content fetching with include options
-- **Asset Management**: TTS asset retrieval with signed URLs
-
-#### Text-to-Speech Services
-- **On-Demand Synthesis**: Real-time text-to-speech conversion with timepoints
-- **Asset Retrieval**: Pre-generated TTS asset access with URL generation
-- **Audio Processing**: Base64 audio content handling and management
-- **Timepoint Support**: Word-level timing data for synchronized highlighting
-
-#### Answer Formulation API
-- **Transcript Refinement**: AI-powered refinement of spoken transcripts
-- **Edit Commands**: Voice-based editing with session management
-- **Session Tracking**: Complete session lifecycle management
-- **Fidelity Scoring**: Quality assessment and iteration tracking
-
-#### User Profile Services
-- **Profile Management**: User profile retrieval and updates
-- **Preference Sync**: User preference synchronization with backend
-- **Metadata Handling**: Flexible metadata storage and retrieval
-- **Account Management**: Complete user account operations
-
-**API Methods**:
-
-##### Authentication Methods
-- **getAuthToken()**: Retrieves current user's Firebase ID token
-- **Token Injection**: Automatic interceptor-based token attachment
-
-##### Chat & Communication
-- **chat(payload)**: Sends chat queries with document and thread context
-- **uploadAudioMessage(formData, options)**: Handles audio uploads with processing modes
-- **cancelQuiz(threadId)**: Cancels active quiz sessions
-
-##### Document Operations
-- **getDocument(documentId)**: Retrieves document details with content
-- **listDocuments()**: Fetches user's document collection
-- **uploadDocument(file, metadata)**: Uploads files with metadata
-- **deleteDocument(documentId)**: Removes documents from storage
-
-##### TTS Services
-- **synthesizeText(text)**: Converts text to speech with timepoints
-- **getTtsAssets(documentId)**: Retrieves pre-generated TTS assets
-
-##### Answer Formulation
-- **refineAnswer(request)**: Refines transcripts into written answers
-- **editAnswer(request)**: Applies voice-based edit commands
-
-##### User Management
-- **getUserProfile()**: Retrieves user profile and preferences
-- **updateUserProfile(updates)**: Updates user profile information
-
-**Inputs**:
-- Authentication tokens from Firebase
-- User data and preferences
-- Document files and metadata
-- Audio recordings and text content
-
-**Outputs/Side Effects**:
-- HTTP requests to backend APIs
-- Transformed response data
-- Error handling and user feedback
-- Token refresh and authentication state updates
-
-**Dependencies**: 
-- Axios for HTTP client functionality
-- Firebase Authentication for token management
-- TypeScript interfaces for type safety
-- Environment configuration for API URLs
+1. **Harden Quiz Trigger (P1 Priority):**  
+   * **Issue:** The startQuiz method triggers the backend agent by sending a hardcoded natural language string: "Start a quiz for document ${documentId}".  
+   * **Risk:** This is extremely brittle. If the backend agent's system prompt is updated or if the LLM interprets the intent differently, the "Start Quiz" button will fail silently or produce unexpected results.  
+   * **Action:** Deprecate the magic string. Update the backend /api/v2/agent/chat endpoint to accept a structured command or action field (e.g., { action: "START\_QUIZ", documentId: "..." }) that the Supervisor graph can route deterministically.  
+2. **Standardize HTTP Client (P2 Priority):**  
+   * **Issue:** The uploadAudioMessage function uses the native fetch API instead of the shared axios instance.  
+   * **Impact:** This forces the method to manually re-implement logic for getting the auth token and setting headers, violating DRY (Don't Repeat Yourself) principles and bypassing global interceptors.  
+   * **Action:** Refactor uploadAudioMessage to use the api (Axios) instance. Axios fully supports FormData and multipart uploads, so there is no technical reason to use fetch here.  
+3. **Implement Centralized Error Handling (P2 Priority):**  
+   * **Issue:** The codebase lacks a centralized error handler. Most methods catch errors only to log them to the console and then return partial objects or re-throw raw errors.  
+   * **Action:** Implement a global Axios response interceptor that transforms common HTTP errors (401 Unauthorized, 403 Forbidden, 500 Server Error) into standardized AppError objects or triggers global UI notifications (like Toasts) automatically.
 
 ---
 
-## Service Architecture Patterns
+## **3\. Service Architecture**
 
-### Design Principles
-- **Centralized Communication**: Single point of contact for all backend interactions
-- **Abstraction Layer**: Hides HTTP complexity from application components
-- **Type Safety**: Comprehensive TypeScript interfaces for all operations
-- **Error Handling**: Consistent error handling and user feedback
+### **Core Infrastructure**
 
-### Authentication Strategy
-- **Automatic Token Injection**: Interceptor-based token management
-- **Token Refresh**: Seamless token refresh for long-running sessions
-- **Error Recovery**: Graceful handling of authentication failures
-- **User Context**: Integration with Firebase Authentication system
+* **HTTP Client:** Uses axios with a base URL derived from VITE\_BACKEND\_API\_URL.  
+* **Authentication:** Uses an **Axios Request Interceptor** to automatically inject the Firebase ID token into the Authorization: Bearer header for every request.  
+* **Auth Dependency:** deeply coupled to ../firebase/config. It accesses auth.currentUser directly to retrieve tokens.
 
-### Data Transformation
-- **Response Mapping**: Intelligent mapping between backend and frontend formats
-- **Type Coercion**: Proper type conversion and validation
-- **Normalization**: Consistent data structure across the application
-- **Legacy Support**: Backward compatibility with API changes
+### **Implementation Patterns**
 
-### Error Handling
-- **Centralized Error Management**: Consistent error handling across all methods
-- **User-Friendly Messages**: Transformed technical errors into user feedback
-- **Logging Integration**: Comprehensive error logging for debugging
-- **Graceful Degradation**: Fallback behavior for service failures
+* **Type Safety:** Strong TypeScript interfaces are defined for complex features like Answer Formulation (RefineAnswerRequest, RefineAnswerResponse), ensuring contract safety.  
+* **Response Mapping:** The service layer handles data normalization, mapping backend snake\_case fields (e.g., final\_agent\_response) to frontend camelCase expectations (e.g., agent\_response) before the data reaches UI components.
 
-### Performance Optimization
-- **Request Interception**: Efficient token management and request modification
-- **Response Caching**: Potential for response caching strategies
-- **Connection Reuse**: Axios instance reuse for connection pooling
-- **Lazy Loading**: On-demand service initialization
+---
 
-### Integration Patterns
-- **Context Integration**: Seamless integration with React contexts
-- **Hook Compatibility**: Designed to work with custom hooks
-- **Component Abstraction**: Clean separation from UI components
-- **Service Composition**: Composable service methods for complex operations
+## **4\. Detailed Method Inventory**
 
-This service architecture provides a robust, maintainable, and scalable foundation for frontend-backend communication, with proper separation of concerns, comprehensive error handling, and type safety throughout the application. The centralized API service ensures consistent behavior and simplifies maintenance while providing the flexibility needed for complex features like chat, document management, and answer formulation.
+### **Chat & Agent Services**
+
+* **chat(payload)**: The primary interface for the LangGraph agent. It handles text queries, thread IDs, and document context. It maps the complex backend response (including timepoints, audio, quiz\_status) to a frontend-friendly structure.  
+* **uploadAudioMessage(formData)**: Handles voice inputs. Supports two modes: review (returns transcript for editing) and direct\_send (processes immediately). **Note:** Uses fetch manually.  
+* **startQuiz / continueQuiz / cancelQuiz**: Helpers that abstract the interactions with the Quiz Graph. startQuiz relies on the "magic string" discussed in Recommendations.
+
+### **Document Management**
+
+* **uploadDocument(file)**: Sends multipart form data to upload files.  
+* **getDocument(id)**: Fetches document metadata. Uses include\_content=true to retrieve the full text/content for the viewer.  
+* **getTtsAssets(id)**: Retrieves signed GCS URLs for pre-generated audio files, enabling the "Listen" feature for documents.
+
+### **Answer Formulation**
+
+* **refineAnswer / editAnswer**: Wrappers for the specialized Answer Formulation graph. They handle the "Refine" and "Edit" loops for student writing assistance.
+
+### **Text-to-Speech (TTS)**
+
+* **synthesizeText(text)**: Calls the backend's on-demand TTS endpoint. Used for dynamic content (like chat responses) that wasn't pre-generated.
+
+### **User Profile**
+
+* **getUserProfile / updateUserProfile**: CRUD operations for the user's preferences and display name, synced between Firebase Auth and Firestore.

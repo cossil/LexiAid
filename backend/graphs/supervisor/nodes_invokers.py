@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from backend.graphs.supervisor.state import SupervisorState
 from backend.graphs.new_chat_graph import GeneralQueryState # State for the new_chat_graph
 from backend.graphs.quiz_engine_graph import QuizEngineState # State for the Quiz Engine v2
+from backend.utils.message_utils import serialize_messages, deserialize_messages
 
 DEFAULT_MAX_QUIZ_QUESTIONS = 5
 
@@ -61,7 +62,7 @@ def invoke_new_chat_graph_node(state: SupervisorState, graph_instance: Any) -> d
         "thread_id": active_chat_thread_id, 
         "document_id": document_id,
         "query": current_query,
-        "messages": state.get("conversation_history", []),
+        "messages": deserialize_messages(state.get("conversation_history", [])),
         "response": None,
         "error_message": None
     }
@@ -79,7 +80,8 @@ def invoke_new_chat_graph_node(state: SupervisorState, graph_instance: Any) -> d
             updates["final_agent_response"] = response_state.get("response")
             updated_history = response_state.get("messages", [])
             if updated_history:
-                 updates["conversation_history"] = updated_history
+                 # Serialize messages before storing in supervisor state
+                 updates["conversation_history"] = serialize_messages(updated_history)
             
             if response_state.get("error_message"):
                 # Log error from chat_graph, but it might have also produced a user-facing response
@@ -99,6 +101,11 @@ def invoke_new_chat_graph_node(state: SupervisorState, graph_instance: Any) -> d
         updates["final_agent_response"] = "I'm sorry, an unexpected error occurred while I was thinking."
 
     print(f"[Supervisor] New Chat Graph invocation complete. Response: '{updates.get('final_agent_response', '')[:100]}...'NextGraph: {updates.get('next_graph_to_invoke')}")
+    
+    # --- Safety serialization for all message states before checkpoint ---
+    if "conversation_history" in updates:
+        updates["conversation_history"] = serialize_messages(updates["conversation_history"])
+    
     return updates
 
 def invoke_quiz_engine_graph_node(state: SupervisorState, graph_instance: Any) -> dict[str, Any]:
@@ -275,5 +282,10 @@ def invoke_quiz_engine_graph_node(state: SupervisorState, graph_instance: Any) -
         updates["active_quiz_v2_thread_id"] = None
 
     print(f"[Supervisor] Quiz Engine Graph invocation complete. Response: '{updates.get('final_agent_response', '')[:100]}...', QuizActive: {updates.get('is_quiz_v2_active')}, NextGraph: {updates.get('next_graph_to_invoke')}")
+    
+    # --- Safety serialization for all message states before checkpoint ---
+    if "conversation_history" in updates:
+        updates["conversation_history"] = serialize_messages(updates["conversation_history"])
+    
     return updates
 

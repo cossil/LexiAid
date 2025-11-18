@@ -71,10 +71,12 @@ from backend.graphs.supervisor import create_supervisor_graph
 from backend.graphs.supervisor.state import SupervisorState
 from backend.graphs.answer_formulation.graph import create_answer_formulation_graph # For Answer Formulation
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 # import os # os is already imported
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables.graph import MermaidDrawMethod
 from langchain_core.runnables import RunnableConfig
+from backend.utils.message_utils import serialize_messages, deserialize_messages, serialize_deep, deserialize_deep
 from functools import wraps # Added for auth decorator
 
 # Import Blueprints using absolute paths
@@ -115,6 +117,14 @@ def initialize_component(component_class, component_name, app_config_key, **kwar
 with app.app_context():
     app.config['SERVICES'] = {}
     app.config['TOOLS'] = {}
+
+    # Activate optional LangGraph diagnostics patch (for debugging)
+    try:
+        import backend.diagnostics.langgraph_patch  # noqa
+        logging.info("LangGraph diagnostics patch activated")
+        print("[LangGraph Patch] Deep serialization & SqliteSaver monkeypatch ACTIVE")
+    except Exception as e:
+        logging.warning("LangGraph diagnostics patch not loaded: %s", e)
 
     # Initialize services
     auth_service = initialize_component(AuthService, 'AuthService', 'SERVICES')
@@ -202,6 +212,23 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Safe Supervisor Invoke Wrapper
+def safe_supervisor_invoke(compiled_supervisor_graph, supervisor_input, config=None):
+    """Deep-serialize all message objects before and after LangGraph invoke."""
+    # Deep-serialize all message objects before invoke
+    safe_input = serialize_deep(supervisor_input)
+    logging.debug("[SAFE_INVOKE] Supervisor input deep-serialized. Types: %s",
+                  {k: type(v).__name__ for k, v in safe_input.items()})
+
+    # Invoke LangGraph
+    result = compiled_supervisor_graph.invoke(safe_input, config=config)
+
+    # Deep-serialize result before checkpoint persistence
+    safe_result = serialize_deep(result)
+    logging.debug("[SAFE_INVOKE] Supervisor result deep-serialized after invoke.")
+
+    return safe_result
+
 # Initialize database connections and checkpointers in a thread-safe way
 class DatabaseManager:
     _instance = None
@@ -226,35 +253,35 @@ class DatabaseManager:
         QUIZ_DB_PATH = os.path.join(APP_DIR, "quiz_checkpoints.db")
         os.makedirs(os.path.dirname(QUIZ_DB_PATH), exist_ok=True)
         self.quiz_db_conn = sqlite3.connect(QUIZ_DB_PATH, check_same_thread=False)
-        self.quiz_checkpointer = SqliteSaver(conn=self.quiz_db_conn)
+        self.quiz_checkpointer = SqliteSaver(conn=self.quiz_db_conn, serde=JsonPlusSerializer())
         print(f"DEBUG [APP - _initialize]: self.quiz_checkpointer type: {type(self.quiz_checkpointer)}, hasattr 'get_next_version': {hasattr(self.quiz_checkpointer, 'get_next_version')}")
     
     # Initialize GeneralQueryGraph checkpointer
         GENERAL_QUERY_DB_PATH = os.path.join(APP_DIR, "general_query_checkpoints.db")
         os.makedirs(os.path.dirname(GENERAL_QUERY_DB_PATH), exist_ok=True)
         self.general_query_db_conn = sqlite3.connect(GENERAL_QUERY_DB_PATH, check_same_thread=False)
-        self.general_query_checkpointer = SqliteSaver(conn=self.general_query_db_conn)
+        self.general_query_checkpointer = SqliteSaver(conn=self.general_query_db_conn, serde=JsonPlusSerializer())
         print(f"DEBUG [APP - _initialize]: self.general_query_checkpointer type: {type(self.general_query_checkpointer)}, hasattr 'get_next_version': {hasattr(self.general_query_checkpointer, 'get_next_version')}")
     
     # Initialize SupervisorGraph checkpointer
         SUPERVISOR_DB_PATH = os.path.join(APP_DIR, "supervisor_checkpoints.db")
         os.makedirs(os.path.dirname(SUPERVISOR_DB_PATH), exist_ok=True)
         self.supervisor_db_conn = sqlite3.connect(SUPERVISOR_DB_PATH, check_same_thread=False)
-        self.supervisor_checkpointer = SqliteSaver(conn=self.supervisor_db_conn)
+        self.supervisor_checkpointer = SqliteSaver(conn=self.supervisor_db_conn, serde=JsonPlusSerializer())
         print(f"DEBUG [APP - _initialize]: self.supervisor_checkpointer type: {type(self.supervisor_checkpointer)}, hasattr 'get_next_version': {hasattr(self.supervisor_checkpointer, 'get_next_version')}")
 
     # Initialize DocumentUnderstandingGraph checkpointer
         DU_DB_PATH = os.path.join(APP_DIR, "document_understanding_checkpoints.db")
         os.makedirs(os.path.dirname(DU_DB_PATH), exist_ok=True)
         self.du_db_conn = sqlite3.connect(DU_DB_PATH, check_same_thread=False)
-        self.du_checkpointer = SqliteSaver(conn=self.du_db_conn)
+        self.du_checkpointer = SqliteSaver(conn=self.du_db_conn, serde=JsonPlusSerializer())
         print(f"DEBUG [APP - _initialize]: self.du_checkpointer type: {type(self.du_checkpointer)}, hasattr 'get_next_version': {hasattr(self.du_checkpointer, 'get_next_version')}")
 
     # Initialize AnswerFormulationGraph checkpointer
         ANSWER_FORMULATION_DB_PATH = os.path.join(APP_DIR, "answer_formulation_sessions.db")
         os.makedirs(os.path.dirname(ANSWER_FORMULATION_DB_PATH), exist_ok=True)
         self.answer_formulation_db_conn = sqlite3.connect(ANSWER_FORMULATION_DB_PATH, check_same_thread=False)
-        self.answer_formulation_checkpointer = SqliteSaver(conn=self.answer_formulation_db_conn)
+        self.answer_formulation_checkpointer = SqliteSaver(conn=self.answer_formulation_db_conn, serde=JsonPlusSerializer())
         print(f"DEBUG [APP - _initialize]: self.answer_formulation_checkpointer initialized for Answer Formulation")
 
     # Create the compiled graphs
@@ -544,6 +571,8 @@ def agent_chat_route():
             try:
                 current_state_checkpoint = compiled_supervisor_graph.get_state(config)
                 conversation_history = current_state_checkpoint.values.get("conversation_history", []) if current_state_checkpoint and hasattr(current_state_checkpoint, 'values') else []
+                # Deserialize messages after restoring from checkpoint
+                conversation_history = deserialize_messages(conversation_history)
                 print(f"[API] Retrieved conversation history with {len(conversation_history)} messages")
             except Exception as e:
                 print(f"[API] Could not retrieve current state: {e}. Starting with empty history.")
@@ -580,7 +609,15 @@ def agent_chat_route():
             print(f"[API] Invoking supervisor for existing thread {thread_id} with input.")
 
         logging.warning(f"SUPERVISOR_INPUT_STATE before invoke: {supervisor_input}")
-        result = compiled_supervisor_graph.invoke(supervisor_input, config=config)
+        # Add diagnostic logging before safe invoke
+        logging.debug("[DEBUG][Invoke] supervisor_input pre-invoke: %s", type(supervisor_input.get("conversation_history", [])))
+        
+        # Use safe supervisor invoke wrapper instead of direct invoke
+        result = safe_supervisor_invoke(compiled_supervisor_graph, supervisor_input, config=config)
+        
+        # Add diagnostic logging after serialization
+        logging.debug("[DEBUG][Serialize] conversation_history types after serialization: %s",
+                      [type(x).__name__ for x in supervisor_input.get("conversation_history", [])])
         print(f"[API DEBUG] Raw result from supervisor: {result}")
         print(f"[API DEBUG] final_agent_response in result: {result.get('final_agent_response')}")
 
@@ -598,7 +635,13 @@ def agent_chat_route():
             quiz_specific_config = {"configurable": {"thread_id": active_quiz_thread_id_from_result, "user_id": user_id}}
             try:
                 # 'result' is the full state dictionary from the supervisor graph's execution.
-                compiled_supervisor_graph.update_state(quiz_specific_config, result)
+                # Serialize messages before checkpointing
+                serialized_result = result.copy()
+                if "conversation_history" in serialized_result:
+                    serialized_result["conversation_history"] = serialize_messages(
+                        serialized_result["conversation_history"]
+                    )
+                compiled_supervisor_graph.update_state(quiz_specific_config, serialized_result)
                 print(f"[API] State successfully checkpointed for new quiz thread: {active_quiz_thread_id_from_result}")
             except Exception as e_checkpoint:
                 print(f"[API] CRITICAL ERROR: Failed to checkpoint state for new quiz thread {active_quiz_thread_id_from_result}: {e_checkpoint}")
@@ -610,9 +653,20 @@ def agent_chat_route():
         response_text = result.get("final_agent_response", "Sorry, I encountered an issue.")
         serializable_history = []
         for msg in result.get("conversation_history", []):
-            if isinstance(msg, HumanMessage): serializable_history.append({"type": "human", "content": msg.content})
-            elif isinstance(msg, AIMessage): serializable_history.append({"type": "ai", "content": msg.content})
-            else: serializable_history.append({"type": "system", "content": str(msg.content)})
+            if isinstance(msg, dict):
+                # Already serialized format from our fix
+                if msg.get("type") == "human":
+                    serializable_history.append({"type": "human", "content": msg["data"]["content"]})
+                elif msg.get("type") == "ai":
+                    serializable_history.append({"type": "ai", "content": msg["data"]["content"]})
+                else:
+                    serializable_history.append({"type": "system", "content": str(msg.get("data", {}).get("content", ""))})
+            elif isinstance(msg, HumanMessage):
+                serializable_history.append({"type": "human", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                serializable_history.append({"type": "ai", "content": msg.content})
+            else:
+                serializable_history.append({"type": "system", "content": str(msg.content)})
 
         # Generate TTS for the agent's response
         audio_content_base64 = None

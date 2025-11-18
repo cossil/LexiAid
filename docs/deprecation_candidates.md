@@ -1,222 +1,71 @@
-# Deprecation Candidates
+# **Analysis: Deprecation & Cleanup Candidates**
 
-## Overview
-This document provides a definitive list of all files that are truly unused and can be safely deleted from the LexiAid codebase. Each file includes a brief justification for removal.
+Document Version: 2.0 (Converged)  
+Status: Final Audit
 
-## Safe to Delete - Frontend Files
+## **1\. Overview**
 
-### 1. Development/Testing Files
-```
-File: src/pages/dev/DeprecationShowcase.tsx
-Justification: 
-- Imports non-existent components (Hero, CTA, FeatureCard, Features, Navbar, Footer, MessageWithTTS)
-- Causes build errors due to broken imports
-- Appears to be a development/testing component that is not functional
-- No routes reference this component in active routing configuration
-Risk: LOW - No active dependencies
-```
+This document provides a definitive, validated list of files targeted for deletion to reduce technical debt. It synthesizes the findings from the frontend and backend audits, explicitly correcting dangerous false positives found in earlier automated scans.
 
-### 2. Unused Component Files
-```
-File: src/pages/DocumentView.tsx
-Justification:
-- Not referenced in main routing configuration (App.tsx)
-- No imports found in any active files
-- Appears to be superseded by document functionality in ChatPage and Dashboard
-- Contains document viewing logic that is duplicated elsewhere
-Risk: LOW - No active dependencies
+Critical Correction:  
+Previous automated analysis incorrectly identified DocumentView.tsx and Settings.tsx as unused. These files are active core components routed in App.tsx and linked in DashboardLayout.tsx. They have been moved to the "Protected" list below.
 
-File: src/pages/Settings.tsx  
-Justification:
-- Not connected to main navigation or routing
-- No active imports or references
-- Settings functionality exists but is not accessible in current UI
-- May be placeholder for future feature
-Risk: LOW - No active dependencies
-```
+## 
 
-### 3. Unused Utility Files
-```
-File: src/utils/unusedUtils.ts (if exists)
-Justification:
-- No imports found in codebase search
-- Likely leftover from previous development
-- Contains utility functions that are duplicated or unused
-Risk: LOW - No active dependencies
-```
+## **2\. Consolidated Recommendations (Action Plan)**
 
-## Safe to Delete - Backend Files
+### **1\. Backend Cleanup (P2 Priority)**
 
-### 1. Deprecated Route Files
-```
-File: backend/routes/legacy_routes.py (if exists)
-Justification:
-- Contains old API endpoints that have been superseded by v2 endpoints
-- No active imports in main app.py
-- Endpoints are deprecated in favor of /api/v2/ routes
-Risk: LOW - No active dependencies
-```
+* **Target:** backend/services/doc\_ai\_service.py  
+* **Action:** Delete the file.  
+* **Required Step:** Update backend/app.py to remove the import and the initialize\_component call for DocAIService.  
+* **Rationale:** Confirmed legacy code. The upload pipeline now uses run\_dua\_processing\_for\_document, which calls Vertex AI directly, bypassing this service.
 
-### 2. Old Migration Files
-```
-File: backend/migrations/old_migration_scripts/ (directory)
-Justification:
-- Contains migration scripts that have already been applied
-- Old migrations are no longer needed after successful deployment
-- Database is already in the expected state
-Risk: LOW - Already applied migrations
-```
+### **2\. Frontend Dev Tools Cleanup (P3 Priority)**
 
-## Safe to Delete - Configuration Files
+* **Target:** src/pages/dev/DeprecationShowcase.tsx  
+* **Action:** Delete the file and the route definition in App.tsx.  
+* **Rationale:** This is a development-only view used to host deprecated components. Removing it allows us to safely delete the "dead" components it references.
 
-### 1. Unused Configuration
-```
-File: .env.example.old
-Justification:
-- Outdated environment variable template
-- Superseded by current .env.example
-- Contains deprecated configuration options
-Risk: LOW - Documentation only
+### **3\. Orphaned Component Removal (P3 Priority)**
 
-File: docker-compose.override.yml (if exists)
-Justification:
-- Development override that is no longer used
-- Contains settings that conflict with current setup
-- Not referenced in any deployment scripts
-Risk: LOW - Development only
-```
+* **Targets:** src/components/Hero.tsx, CTA.tsx, FeatureCard.tsx, Features.tsx, Navbar.tsx, Footer.tsx, MessageWithTTS.tsx.  
+* **Action:** Delete these files.  
+* **Rationale:** These are legacy Landing Page components that are currently *only* referenced by the DeprecationShowcase. Once the showcase is removed, these become true dead code.
 
-## Safe to Delete - Test Files
+---
 
-### 1. Broken Test Files
-```
-File: src/components/__tests__/broken-test.test.tsx (if exists)
-Justification:
-- Test file with syntax errors or broken imports
-- Not passing in current test suite
-- References components that no longer exist
-Risk: LOW - Test infrastructure only
-```
+## **3\. Detailed File Status**
 
-## Requires Investigation - Frontend Files
+### **✅ Safe to Delete (Confirmed Dead Code)**
 
-### 1. Potentially Unused Components
-```
-File: src/components/MessageWithTTS.tsx
-Justification:
-- Only referenced in DeprecationShowcase.tsx (which is being deleted)
-- No other active imports found
-- May be legacy component superseded by SpeakableText
-Risk: MEDIUM - Verify no dynamic imports before deletion
+| File / Directory | Category | Justification |
+| :---- | :---- | :---- |
+| backend/services/doc\_ai\_service.py | Backend Service | Replaced by LangGraph Agent (document\_understanding\_agent). |
+| src/pages/dev/DeprecationShowcase.tsx | Frontend Page | Dev-only utility for viewing deprecated UI. |
+| src/components/Hero.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/CTA.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/FeatureCard.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/Features.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/Navbar.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/Footer.tsx | Frontend Component | Unused legacy Landing Page asset. |
+| src/components/MessageWithTTS.tsx | Frontend Component | Superseded by SpeakableText / GeminiChatInterface. |
+| .env.example.old | Config | Outdated documentation. |
 
-File: src/components/Hero.tsx
-File: src/components/CTA.tsx  
-File: src/components/FeatureCard.tsx
-File: src/components/Features.tsx
-File: src/components/Navbar.tsx
-File: src/components/Footer.tsx
-Justification:
-- Only imported in DeprecationShowcase.tsx
-- No other references in codebase
-- Appear to be landing page components that may have been replaced
-Risk: MEDIUM - May be used in future landing page redesign
-```
+### **❌ Protected (False Positives \- DO NOT DELETE)**
 
-### 2. Unused Hook Files
-```
-File: src/hooks/useLegacyFeature.ts (if exists)
-Justification:
-- No active imports found
-- May contain logic that was migrated to other hooks
-- Could contain reusable functionality that should be preserved
-Risk: MEDIUM - Review content before deletion
-```
+| File | Status | Evidence of Usage |
+| :---- | :---- | :---- |
+| src/pages/DocumentView.tsx | **ACTIVE** | Routed at /dashboard/documents/:id in App.tsx. Core reading interface. |
+| src/pages/Settings.tsx | **ACTIVE** | Routed at /dashboard/settings in App.tsx. Linked in DashboardLayout.tsx. |
+| backend/services/progress\_service.py | **N/A** | Does not exist (Hallucination in previous reports). |
 
-## Requires Investigation - Backend Files
+---
 
-### 1. Old Service Files
-```
-File: backend/services/legacy_service.py (if exists)
-Justification:
-- Not imported in main application
-- May contain business logic that was migrated
-- Could have utility functions still in use
-Risk: MEDIUM - Review for any useful functions before deletion
-```
+## **4\. Verification Steps**
 
-## Safe to Delete - Asset Files
+Before executing deletions, run the following checks:
 
-### 1. Unused Images and Assets
-```
-Directory: src/assets/unused-images/
-Justification:
-- Contains image files not referenced in any component
-- May be leftover from previous design iterations
-- No imports found in codebase search
-Risk: LOW - Static assets only
-
-File: public/icons/old-icon.svg
-Justification:
-- Not referenced in any component or HTML file
-- Superseded by new icon set (lucide-react)
-Risk: LOW - Static asset only
-```
-
-## Cleanup Recommendations by Priority
-
-### High Priority (Safe to Delete Immediately)
-1. `src/pages/dev/DeprecationShowcase.tsx` - Broken imports, causes build errors
-2. `.env.example.old` - Outdated documentation
-3. `src/assets/unused-images/` directory - Unused static assets
-4. `public/icons/old-icon.svg` - Unused static asset
-
-### Medium Priority (Delete After Verification)
-1. `src/pages/DocumentView.tsx` - Verify no dynamic imports
-2. `src/pages/Settings.tsx` - Verify not planned for immediate use
-3. `src/components/MessageWithTTS.tsx` - Check if functionality is needed
-4. Landing page components (Hero, CTA, etc.) - Verify not needed for future use
-
-### Low Priority (Review Before Deletion)
-1. Any backend legacy files - Review for useful functions
-2. Old migration scripts - Ensure they're not needed for rollbacks
-3. Test files with broken imports - Fix or remove based on testing needs
-
-## Deletion Safety Checklist
-
-Before deleting any file, verify:
-
-### Frontend Files
-- [ ] No static imports in any .tsx/.ts files
-- [ ] No dynamic imports using import() or require()
-- [ ] No references in routing configuration
-- [ ] No references in test files
-- [ ] No references in documentation or README files
-
-### Backend Files  
-- [ ] No imports in app.py or other service files
-- [ ] No references in route definitions
-- [ ] No references in database migrations
-- [ ] No references in deployment scripts
-- [ ] No references in API documentation
-
-### Configuration Files
-- [ ] Not referenced in any deployment scripts
-- [ ] Not referenced in documentation
-- [ ] Not referenced in CI/CD pipelines
-- [ ] Contains outdated or superseded information
-
-## Estimated Impact
-
-### Files Safe for Immediate Deletion
-- **Count**: 4-6 files
-- **Size Reduction**: ~50-100 KB
-- **Risk**: Very Low
-- **Build Impact**: Fixes build errors from DeprecationShowcase
-
-### Files Requiring Investigation
-- **Count**: 6-8 files  
-- **Size Reduction**: ~200-500 KB
-- **Risk**: Low to Medium
-- **Build Impact**: Minimal after verification
-
-This deprecation list provides a safe, systematic approach to cleaning up the LexiAid codebase while minimizing risk to active functionality.
+1. **Grep Check:** Run grep \-r "DocAIService" . to ensure the only remaining reference is in app.py (which you will remove).  
+2. **Build Check:** After deleting the Frontend components, run npm run build. If the build fails, it means a file was still referenced (likely in App.tsx imports).  
+3. **Route Check:** Verify App.tsx no longer imports DeprecationShowcase inside the import.meta.env.DEV block.

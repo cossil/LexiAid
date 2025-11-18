@@ -1,334 +1,85 @@
-# Frontend Pages Analysis
+# **Analysis: Frontend Pages**
 
-## Overview
-The frontend pages provide the user interface components for the LexiAid application, with each page serving specific functional purposes while maintaining consistent accessibility features, responsive design, and integration with the application's context system.
+Document Version: 2.0 (Converged)  
+Status: Final Audit
 
-## Page Components
+## 
 
-### 1. LandingPage.tsx
+## **1\. Overview**
 
-**Purpose**: Public landing page that introduces the LexiAid platform, showcases key features, and provides navigation to authentication routes.
+This document provides a complete analysis of the frontend's page components (src/pages). These components serve as the primary views for the application, orchestrating the user interface by connecting **Contexts** (Auth, Accessibility) with **Services** (API, TTS) and **Custom Hooks**.
 
-**Key Functions/Components**:
+The audit reveals a functional but inconsistent architecture. While core flows like Chat and Answer Formulation are robust and well-patterned, other areas like the Dashboard and Document Upload contain placeholder data and technical debt that require immediate remediation.
 
-#### Accessibility Features
-- **High Contrast Mode**: Toggle for visual accessibility with proper ARIA attributes
-- **UI TTS Support**: Text-to-speech for interface elements on hover
-- **Keyboard Navigation**: Skip links and focus management
-- **Responsive Design**: Mobile-first layout with Tailwind CSS
+## **2\. Consolidated Recommendations (Action Plan)**
 
-#### Content Sections
-- **Navigation Bar**: Brand logo, accessibility toggles, and sign-in link
-- **Hero Section**: Main value proposition with call-to-action buttons
-- **Features Section**: Highlighted capabilities with icons and descriptions
-- **Benefits Section**: Advantages for students with dyslexia
-- **Call-to-Action**: Multiple entry points to user registration
+### **1\. Implement Progress Backend (P2 Priority \- Integrity)**
 
-#### Interactive Elements
-- **SpeakableText Component**: Precise TTS targeting for specific text elements
-- **Hover Handlers**: Contextual audio descriptions for UI elements
-- **Theme Toggling**: Real-time high contrast mode switching
+* **Issue:** The Dashboard.tsx page displays hardcoded placeholder data for user progress (e.g., "120 minutes studied"). The actual API call to /api/progress is commented out.  
+* **Risk:** The application presents false data to the user, which degrades trust.  
+* **Action:** Implement the backend /api/progress endpoint (or a suitable Firestore aggregation) and uncomment the fetch logic in Dashboard.tsx to display real metrics.
 
-**Inputs**: 
-- User accessibility preferences from context
-- Mouse hover events for TTS triggering
-- Click events for navigation and settings
+### **2\. Refactor Document Upload (P2 Priority \- Tech Debt)**
 
-**Outputs/Side Effects**:
-- Navigation to authentication routes
-- Accessibility preference updates
-- Audio playback for interface elements
-- Visual theme changes
+* **Issue:** The DocumentUpload.tsx page manually imports axios and re-implements the Authorization header injection logic, bypassing the shared apiService interceptors.  
+* **Risk:** This violates DRY (Don't Repeat Yourself) principles. If the authentication logic changes (e.g., token refresh handling), this page will break or become insecure.  
+* **Action:** Refactor DocumentUpload.tsx to use apiService.uploadDocument.
 
-**Dependencies**: 
-- React Router for navigation
-- Accessibility Context for preferences
-- SpeakableText component for TTS
-- Lucide React icons
+### **3\. Standardize Page Architecture (P3 Priority \- Maintainability)**
+
+* **Observation:** The ChatPage represents the "Gold Standard" for page architecture in this codebase. It cleanly delegates logic to hooks (useChatTTSPlayer) and components (GeminiChatInterface), while handling layout and context connection.  
+* **Action:** Adopt the ChatPage pattern for future pages: keep the page component thin and move logic into custom hooks.
 
 ---
 
-### 2. Dashboard.tsx
+## **3\. Detailed Page Analysis**
 
-**Purpose**: Main user dashboard providing overview of recent activity, quick access to features, and personalized progress tracking.
+### **Dashboard.tsx**
 
-**Key Functions/Components**:
+* **Purpose:** The personalized landing hub for authenticated users.  
+* **Features:**  
+  * **Quick Actions:** Navigation cards for Upload, Study, Chat, etc.  
+  * **Recent Documents:** Fetches real document data via axios (though it should use apiService).  
+  * **Progress Summary:** **\[Incomplete\]** Renders a static "Streak" and "Study Time" based on placeholder variables.  
+* **Dependencies:** useAuth, useAccessibility.
 
-#### Data Management
-- **Recent Documents**: Fetches and displays user's latest document uploads
-- **Progress Tracking**: Shows learning statistics and study streaks
-- **User Profile**: Displays user information and preferences
-- **Quick Actions**: Navigation shortcuts to main features
+### **ChatPage.tsx**
 
-#### API Integration
-- **Backend Communication**: Fetches documents via authenticated API calls
-- **Token Management**: Uses Firebase ID tokens for secure requests
-- **Error Handling**: Graceful handling of API failures and loading states
+* **Purpose:** The primary interactive interface for the "AI Tutor."  
+* **Architecture:** Acts as a smart container for the GeminiChatInterface.  
+* **Integrations:**  
+  * **LangGraph:** Connects to the backend Agent for chat and quizzes.  
+  * **TTS:** Uses useChatTTSPlayer (or the new useTTSPlayer) to read responses aloud.  
+  * **Context:** Reads documentId from the URL to ground the conversation in a specific text.
 
-#### Accessibility Features
-- **TTS Support**: Audio descriptions for dashboard elements
-- **High Contrast**: Theme-aware component styling
-- **Keyboard Navigation**: Proper focus management and shortcuts
+### **DocumentView.tsx**
 
-**Inputs**:
-- User authentication state
-- Backend API responses
-- User interaction events
+* **Purpose:** A complex, tabbed interface for consuming content.  
+* **Capabilities:**  
+  * **Rendering:** Displays document text or PDF content.  
+  * **Audio:** Integrates with the TTS hooks to provide read-aloud functionality with word-level highlighting.  
+  * **Modes:** Switches between "Read," "Chat," and "Quiz" tabs, effectively serving as a sub-router.
 
-**Outputs/Side Effects**:
-- Document listing and navigation
-- Progress visualization
-- Feature access routing
-- Audio feedback for interactions
+### **DocumentUpload.tsx**
 
-**Dependencies**: 
-- Auth Context for user state
-- Accessibility Context for preferences
-- Axios for API communication
-- React Router for navigation
+* **Purpose:** A wizard for uploading new files.  
+* **Features:** Drag-and-drop zone, file type validation, and progress bars.  
+* **Technical Debt:** Uses a direct axios.post call instead of the centralized apiService.
 
----
+### **AnswerFormulationPage.tsx**
 
-### 3. ChatPage.tsx
+* **Purpose:** A specialized workflow tool for students to practice speaking and writing.  
+* **Architecture:** Heavily reliant on the useAnswerFormulation hook, which manages the complex state machine (Recording $\\rightarrow$ Refining $\\rightarrow$ Editing).
 
-**Purpose**: Interactive chat interface for document-based Q&A and quiz functionality with real-time AI assistance.
+### **pages/dev/DeprecationShowcase.tsx**
 
-**Key Functions/Components**:
-
-#### Chat Management
-- **Message State**: Maintains conversation history with metadata
-- **Thread Management**: Handles conversation persistence via thread IDs
-- **Document Context**: Links conversations to specific documents
-- **Quiz Integration**: Supports quiz mode within chat interface
-
-#### API Communication
-- **Chat Service**: Sends queries to backend supervisor graph
-- **Audio Support**: Handles TTS audio content and timepoints
-- **Error Handling**: Manages API failures and retry logic
-- **Loading States**: Visual feedback during processing
-
-#### User Interface
-- **Message Display**: Renders user and AI messages with proper styling
-- **Input Handling**: Text input with accessibility features
-- **Navigation**: Back navigation and document switching
-- **Quiz Controls**: Start/stop quiz functionality
-
-**Inputs**:
-- User messages and queries
-- Document context from URL parameters
-- Thread IDs for conversation persistence
-
-**Outputs/Side Effects**:
-- AI responses with audio content
-- Updated conversation history
-- Quiz state management
-- Navigation to related features
-
-**Dependencies**: 
-- GeminiChatInterface component
-- API service for backend communication
-- React Router for navigation
-- Toast notifications for user feedback
+* **Purpose:** A developer-only route (guarded by import.meta.env.DEV).  
+* **Usage:** Used to visually test components that are slated for removal or refactoring, ensuring they don't break the production build while being phased out.
 
 ---
 
-### 4. DocumentUpload.tsx
+## **4\. Page Architecture Patterns**
 
-**Purpose**: Document management interface for uploading files with validation, progress tracking, and processing status updates.
-
-**Key Functions/Components**:
-
-#### File Handling
-- **Drag & Drop**: Interactive file upload with visual feedback
-- **File Validation**: Type and size checking with user-friendly errors
-- **Preview Generation**: Image previews for visual file types
-- **Progress Tracking**: Real-time upload progress indication
-
-#### Upload Process
-- **Backend Integration**: Secure file upload to backend API
-- **Authentication**: Token-based upload authorization
-- **Error Handling**: Comprehensive error reporting and recovery
-- **Success Feedback**: Confirmation and navigation options
-
-#### Accessibility Features
-- **TTS Support**: Audio descriptions for upload steps
-- **Keyboard Navigation**: Full keyboard accessibility
-- **Screen Reader Support**: Proper ARIA labels and announcements
-- **Visual Feedback**: Clear status indicators and progress bars
-
-**Inputs**:
-- File selections via drag-and-drop or file input
-- User authentication tokens
-- Document metadata and naming
-
-**Outputs/Side Effects**:
-- File uploads to backend storage
-- Processing status updates
-- Navigation to document viewing
-- User feedback and error reporting
-
-**Dependencies**: 
-- Auth Context for authentication
-- Accessibility Context for preferences
-- Axios for file upload API calls
-- React Router for navigation
-
----
-
-### 5. AnswerFormulationPage.tsx
-
-**Purpose**: Comprehensive answer formulation workflow orchestrating dictation, refinement, editing, and finalization of student responses.
-
-**Key Functions/Components**:
-
-#### Workflow Management
-- **State Orchestration**: Manages complete formulation process via custom hook
-- **Component Coordination**: Organizes sub-components for different workflow stages
-- **Progress Tracking**: Monitors session progress and user preferences
-- **Error Recovery**: Handles failures and provides retry options
-
-#### User Experience
-- **Onboarding**: Guided introduction for new users
-- **Settings Management**: Auto-pause and preference configuration
-- **Progressive Enhancement**: Suggests features based on usage patterns
-- **Session Management**: Tracks completed sessions and user improvement
-
-#### Accessibility Integration
-- **TTS Support**: Full audio feedback throughout workflow
-- **Keyboard Navigation**: Complete keyboard accessibility
-- **Visual Accessibility**: High contrast and dyslexia-friendly fonts
-- **Cognitive Support**: Clear step-by-step guidance
-
-**Inputs**:
-- User questions and prompts
-- Voice recordings and transcripts
-- Edit commands and refinements
-- User preferences and settings
-
-**Outputs/Side Effects**:
-- Refined answer generation
-- Edit history and tracking
-- User preference updates
-- Session completion metrics
-
-**Dependencies**: 
-- useAnswerFormulation custom hook
-- Multiple answer formulation sub-components
-- Auth Context for user preferences
-- Accessibility Context for support features
-
----
-
-### 6. Authentication Pages (SignIn.tsx, SignUp.tsx)
-
-**Purpose**: User authentication interfaces providing secure access to the application with comprehensive accessibility support.
-
-**Key Functions/Components**:
-
-#### Authentication Features
-- **Email/Password Login**: Traditional authentication method
-- **Google Sign-In**: OAuth integration for quick access
-- **Form Validation**: Client-side validation with user feedback
-- **Error Handling**: Clear error messages and recovery guidance
-
-#### Accessibility Support
-- **TTS Integration**: Audio descriptions for form fields and errors
-- **Keyboard Navigation**: Complete form accessibility
-- **Screen Reader Support**: Proper labeling and announcements
-- **Visual Accessibility**: High contrast and clear typography
-
-#### User Experience
-- **Loading States**: Visual feedback during authentication
-- **Success Handling**: Smooth transitions after successful login
-- **Navigation Links**: Easy access between sign-in and sign-up
-- **Responsive Design**: Mobile-friendly form layouts
-
-**Inputs**:
-- User credentials (email, password, display name)
-- Authentication provider selection
-- Form submission events
-
-**Outputs/Side Effects**:
-- User authentication state changes
-- Navigation to dashboard
-- Error message display
-- Session token generation
-
-**Dependencies**: 
-- Auth Context for authentication functions
-- Accessibility Context for TTS support
-- React Router for navigation
-- Firebase Authentication SDK
-
----
-
-### 7. Settings.tsx
-
-**Purpose**: Comprehensive settings interface for managing accessibility preferences, TTS options, and visual customization.
-
-**Key Functions/Components**:
-
-#### Accessibility Settings
-- **TTS Controls**: Enable/disable UI and cloud TTS with delay options
-- **Visual Preferences**: High contrast mode, font sizes, and spacing
-- **Audio Configuration**: TTS delay timing and voice settings
-- **Cognitive Support**: Reading assistance and display options
-
-#### User Interface
-- **Toggle Controls**: Interactive switches for preferences
-- **Option Groups**: Radio buttons for mutually exclusive settings
-- **Real-time Updates**: Immediate application of setting changes
-- **Visual Feedback**: Clear indication of active settings
-
-#### Integration Features
-- **Context Updates**: Synchronizes with accessibility context
-- **Persistence**: Saves preferences to user profile
-- **TTS Preview**: Test settings with immediate audio feedback
-- **Keyboard Navigation**: Full accessibility for all controls
-
-**Inputs**:
-- User preference selections
-- Toggle and radio button interactions
-- Settings confirmation actions
-
-**Outputs/Side Effects**:
-- Accessibility context updates
-- User profile preference storage
-- Real-time UI theme changes
-- Audio feedback for settings
-
-**Dependencies**: 
-- Accessibility Context for state management
-- React Router for navigation
-- Lucide React icons for controls
-- Custom TTS delay types
-
----
-
-## Page Architecture Patterns
-
-### Component Organization
-- **Single Responsibility**: Each page handles one major functional area
-- **Context Integration**: All pages use appropriate contexts for state
-- **Accessibility First**: Built-in support for screen readers and TTS
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-
-### State Management
-- **Context-Based**: Global state through React contexts
-- **Local State**: Component-specific state with React hooks
-- **API Integration**: Backend communication through services
-- **Error Boundaries**: Graceful error handling and recovery
-
-### Accessibility Implementation
-- **WCAG Compliance**: Follows accessibility guidelines throughout
-- **TTS Integration**: Comprehensive audio support for all interfaces
-- **Keyboard Navigation**: Full keyboard accessibility
-- **Visual Accessibility**: High contrast and dyslexia support
-
-### User Experience
-- **Progressive Enhancement**: Features reveal based on user proficiency
-- **Onboarding**: Guided introductions for complex features
-- **Feedback Systems**: Clear success and error states
-- **Performance**: Optimized loading and interaction patterns
-
-This page architecture provides a comprehensive, accessible, and maintainable foundation for the LexiAid application, with special attention to the needs of students with learning disabilities through thoughtful design and extensive accessibility features.
+* **Accessibility-First:** All pages heavily utilize useAccessibility to provide "Speak on Hover" functionality for titles and buttons, enforcing the app's auditory-first design philosophy.  
+* **Context Consumption:** Pages consistently rely on useAuth for user data and DashboardLayout for navigation, ensuring a unified experience.  
+* **Secure Data Fetching:** Despite some inconsistency in *how* the request is made (direct axios vs. service), all data fetching correctly relies on Firebase ID tokens for security.

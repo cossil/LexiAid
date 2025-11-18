@@ -1,184 +1,100 @@
-# Frontend Main Analysis
+# **Analysis: Frontend Main Architecture & State**
 
-## Overview
-The frontend entry points provide the foundation for the LexiAid React application, with a focus on accessibility, routing, authentication, and context management. The application is built with modern React patterns using TypeScript, Tailwind CSS, and comprehensive accessibility features for students with learning disabilities.
+Document Version: 2.0 (Converged)  
+Status: Final Audit
 
-## Frontend Entry Files
+## **1\. Overview**
 
-### 1. main.tsx
+This document provides a complete analysis of the Frontend's initialization, routing structure, and global state management. It synthesizes the architectural review of the entry points (main.tsx, App.tsx) with a critical audit of the Context API layer (src/contexts/\*).
 
-**Purpose**: Application entry point that renders the React app into the DOM with React StrictMode enabled for development checks.
+The application uses a **Provider Stack** architecture to manage global state, wrapping the router in a specific sequence of context providers (Auth $\\rightarrow$ Accessibility $\\rightarrow$ Document/Quiz). A dedicated **User Interaction Gateway** ensures compliance with browser audio policies, critical for the app's text-to-speech (TTS) accessibility features.
 
-**Key Functions/Components**:
-- **ReactDOM.createRoot()**: Creates root DOM node for React 18+ concurrent rendering
-- **root.render()**: Renders the main App component wrapped in React.StrictMode
-- **StrictMode**: Enables development-time checks for potential issues and warnings
+## **2\. Consolidated Recommendations (Action Plan)**
 
-**Inputs**: None (entry point)
-**Outputs/Side Effects**: 
-- Initializes the React application
-- Enables development-time safety checks
-- Mounts the app to the DOM element with id 'root'
+This audit identified specific operational risks regarding data persistence and potential confusion regarding state coupling.
 
-**Dependencies**: React, ReactDOM, App component
-
----
-
-### 2. App.tsx
-
-**Purpose**: Main React application component that establishes routing, authentication, accessibility contexts, and provides the overall application structure.
-
-**Key Functions/Components**:
-
-#### Routing Configuration
-- **BrowserRouter**: Client-side routing using React Router DOM
-- **Route Definitions**: Comprehensive route structure with public and protected routes
-- **ProtectedRoute**: Authentication wrapper for dashboard and protected features
-- **Nested Routes**: Dashboard layout with child routes for different features
-
-#### Route Structure
-```
-Public Routes:
-- / → LandingPage
-- /auth/signin → SignIn
-- /auth/signup → SignUp
-- /auth/forgot-password → ForgotPassword
-
-Protected Routes (under /dashboard):
-- /dashboard → Dashboard (index)
-- /dashboard/chat → ChatPage
-- /dashboard/documents → DocumentUpload
-- /dashboard/quiz → QuizPage
-- /dashboard/answer-formulation → AnswerFormulationPage
-- /dashboard/profile → ProfilePage
-- /dashboard/progress → ProgressPage
-```
-
-#### Context Providers
-- **AuthContext**: Firebase authentication state management
-- **AccessibilityContext**: Accessibility preferences and settings
-- **DocumentContext**: Document selection and management state
-- **QuizContext**: Quiz session and progress tracking
-
-#### Accessibility Features
-- **UserInteractionGateway**: Audio unblocking handler for browser autoplay policies
-- **Skip Navigation**: Keyboard navigation support for screen readers
-- **Focus Management**: Proper focus handling throughout the application
-
-**Inputs**: 
-- Route parameters and navigation state
-- User authentication status
-- Accessibility preferences
-
-**Outputs/Side Effects**:
-- Renders appropriate page components based on routes
-- Manages global application state through contexts
-- Handles authentication redirects and protected route access
-- Provides accessibility features and user interaction handling
-
-**Dependencies**: 
-- React Router DOM for navigation
-- Context providers for state management
-- Page components for different application sections
-- Accessibility utilities and components
+1. **Fix Data Persistence (P1 Priority):**  
+   * **Issue:** Neither DocumentContext nor QuizContext persists data to localStorage.  
+   * **Risk:** If a user refreshes the browser while taking a quiz or reading a document, **all progress is lost**. The active document ID and quiz thread ID are reset to null.  
+   * **Action:** Implement useEffect hooks in both providers to sync their state (activeDocumentId, quizThreadId) to localStorage (or sessionStorage) and rehydrate on mount.  
+2. **Maintain Document Decoupling (Architecture):**  
+   * **Finding:** The DocumentContext is architecturally sound. It is minimal and holds *only* the activeDocumentId. It is **not** coupled to PDF-specific state (like zoom or page numbers), contradicting earlier assumptions.  
+   * **Action:** Preserve this design. Do not add PDF-specific state to this global context. This allows the app to seamlessly support the new text-based "Document Understanding Agent" narratives side-by-side with the PDF viewer without refactoring the global state.  
+3. **Secure Developer Routes (Low Priority):**  
+   * **Issue:** The /dev/deprecation-showcase route is unprotected by authentication.  
+   * **Action:** Ensure this page never includes sensitive administrative tools or production data, as it is accessible to any user with network access to the development server.
 
 ---
 
-### 3. index.css
+## **3\. Detailed File Analysis**
 
-**Purpose**: Global stylesheet providing Tailwind CSS integration, accessibility-focused custom styles, and dyslexia-friendly font support.
+### **Entry Points & Configuration**
 
-**Key Functions/Components**:
+#### **src/main.tsx**
 
-#### Tailwind CSS Integration
-- **@tailwind directives**: Imports base, components, and utilities styles
-- **CSS Custom Properties**: Defines design tokens for theming
-- **Responsive Design**: Mobile-first approach with Tailwind utilities
+* **Role:** The application entry point.  
+* **Key Behaviors:** Mounts the React tree into the DOM and imports index.css to apply global Tailwind layers. Wraps the app in React.StrictMode for development checks.
 
-#### Accessibility Features
-- **OpenDyslexic Font**: Custom font-face declarations for dyslexia-friendly reading
-- **Font Display Strategy**: swap for better loading performance
-- **Focus Styles**: Enhanced focus indicators for keyboard navigation
-- **Touch Targets**: Minimum 44px sizing for interactive elements
+#### **src/index.css**
 
-#### High Contrast Mode
-- **CSS Variables**: Custom properties for high contrast theming
-- **Override Styles**: Important declarations for contrast mode
-- **Component Styling**: Specific overrides for buttons, inputs, and backgrounds
+* **Role:** Global styling and accessibility foundation.  
+* **Key Features:**  
+  * **Typography:** Defines the OpenDyslexic font face.  
+  * **High Contrast:** Defines CSS variables (e.g., \--bg-primary) that respond to the .high-contrast class.  
+  * **Focus Management:** Enforces high-visibility focus rings for keyboard navigation compliance.
 
-#### Navigation Aids
-- **Skip Links**: Keyboard navigation shortcuts for screen readers
-- **Focus Management**: Visible focus indicators with proper offset
-- **Color Contrast**: Blue focus indicators meeting WCAG standards
+#### **src/App.tsx**
 
-#### Custom Components
-- **Scrollbar Styling**: Custom scrollbar for better visibility
-- **Text Highlighting**: Semi-transparent highlighting for text emphasis
-- **Smooth Transitions**: Subtle animations for better UX
+* **Role:** The central hub for Routing, Providers, and Global Guards.  
+* **Key Components:**  
+  * **UserInteractionGateway**: A modal overlay that blocks the UI until the user interacts. This initializes the AudioContext to bypass browser autoplay blocks, ensuring TTS works reliably.  
+  * **Provider Stack:** Establishes the strict hierarchy: AuthProvider $\\rightarrow$ AccessibilityProvider $\\rightarrow$ (DocumentProvider, QuizProvider).  
+  * **Router:**  
+    * **Public:** /, /auth/\*  
+    * **Protected:** /dashboard/\* (Wrapped in ProtectedRoute)  
+    * **Dev:** /dev/deprecation-showcase (Conditionally compiled)
 
-**Inputs**: None (global stylesheet)
-**Outputs/Side Effects**:
-- Applies global styling to the entire application
-- Enables accessibility features through CSS classes
-- Provides responsive design foundation
-- Supports dyslexia-friendly reading experience
+### **Layouts**
 
-**Dependencies**: 
-- Tailwind CSS framework
-- OpenDyslexic font from CDN
-- Custom CSS properties and utilities
+#### **src/layouts/DashboardLayout.tsx**
+
+* **Role:** The persistent UI shell for authenticated users.  
+* **Key Behaviors:**  
+  * **Navigation:** Renders the responsive sidebar/drawer with links to all features.  
+  * **Context Integration:** Consumes useAccessibility to toggle high-contrast mode on the \<html\> root.  
+  * **Interaction Interception:** Intercepts navigation events (e.g., clicking "Chat") if a quiz is active, prompting the user to cancel the session first to prevent state conflicts.
+
+### **Global State (Contexts)**
+
+#### **AuthContext**
+
+* **Purpose:** Wraps the Firebase Web SDK to provide currentUser and loading state.  
+* **Persistence:** Managed automatically by Firebase (IndexedDB/LocalStorage).
+
+#### **AccessibilityContext**
+
+* **Purpose:** Manages UI preferences (High Contrast, TTS enabled) and provides the speakText() function via window.speechSynthesis.  
+* **Persistence:** Preferences are persisted to localStorage.  
+* **Audio Safety:** Relies on App.tsx's UserInteractionGateway to have unlocked the audio engine before this context initializes.
+
+#### **DocumentContext**
+
+* **Purpose:** Tracks the currently selected document.  
+* **State:** Minimal. Contains only activeDocumentId (string) and its setter.  
+* **Status:** **Ephemeral.** Data is lost on refresh.  
+* **Coupling:** **Low.** It is agnostic to the document type (PDF vs. Text), making it future-proof for the DUA integration.
+
+#### **QuizContext**
+
+* **Purpose:** Tracks the active quiz session.  
+* **State:** Contains quizThreadId (string) and isCancelling (boolean).  
+* **Status:** **Ephemeral.** Data is lost on refresh.  
+* **API Integration:** Includes a helper cancelQuizSession that calls the backend to formally close the thread.
 
 ---
 
-### 4. vite-env.d.ts
+## **4\. Architecture Patterns**
 
-**Purpose**: TypeScript environment declaration file for Vite build tool integration.
-
-**Key Functions/Components**:
-- **Type Reference**: Includes Vite client type definitions
-- **Environment Types**: Provides TypeScript support for Vite-specific features
-- **Import Types**: Enables proper type checking for Vite modules
-
-**Inputs**: None (type declaration)
-**Outputs/Side Effects**:
-- Enables TypeScript support for Vite features
-- Provides type definitions for development environment
-- Supports hot module replacement types
-
-**Dependencies**: Vite type definitions
-
----
-
-## Frontend Architecture Patterns
-
-### Component Organization
-- **Hierarchical Structure**: Clear parent-child relationships between components
-- **Route-Based Splitting**: Components organized by application routes
-- **Context Integration**: Global state managed through React contexts
-- **Accessibility First**: All components built with accessibility considerations
-
-### State Management
-- **Context API**: Centralized state for authentication, documents, and user preferences
-- **Local State**: Component-specific state using React hooks
-- **Routing State**: URL-based state management for navigation
-- **Accessibility State**: Persistent accessibility preferences
-
-### Accessibility Implementation
-- **WCAG Compliance**: Follows Web Content Accessibility Guidelines
-- **Screen Reader Support**: Proper ARIA labels and semantic HTML
-- **Keyboard Navigation**: Full keyboard accessibility with focus management
-- **Visual Accessibility**: High contrast modes and dyslexia-friendly fonts
-
-### Performance Considerations
-- **Code Splitting**: Route-based lazy loading for better performance
-- **Font Optimization**: Strategic font loading with display swap
-- **CSS Optimization**: Tailwind's purging and optimization features
-- **React StrictMode**: Development-time performance and safety checks
-
-### Development Experience
-- **TypeScript**: Type safety throughout the application
-- **Hot Module Replacement**: Fast development iteration
-- **Component Composition**: Reusable component patterns
-- **Error Boundaries**: Graceful error handling and recovery
-
-This frontend architecture provides a robust, accessible, and maintainable foundation for the LexiAid application, with special attention to the needs of students with learning disabilities through comprehensive accessibility features and thoughtful design patterns.
+* **Layered Provider Stack:** Contexts are explicitly ordered in App.tsx to prevent runtime errors (e.g., QuizContext can safely depend on AuthContext).  
+* **Audio Gating:** The application uses a "Gateway" pattern to force user interaction before loading, ensuring 100% reliability for audio APIs on restrictive browsers (like Safari).  
+* **Accessibility-First:** High contrast and dyslexia support are not add-ons; they are baked into the root CSS and Layout architecture.
