@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
@@ -7,12 +7,21 @@ import {
   Sun, 
   Type, 
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  Trash2,
+  Save,
+  BadgeCheck,
+  Mail
 } from 'lucide-react';
 import { useAccessibility, TtsDelayOption } from '../contexts/AccessibilityContext';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
+import { toast } from 'react-hot-toast';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser, deleteAccount } = useAuth();
   const { 
     uiTtsEnabled, 
     toggleUiTts, 
@@ -33,6 +42,17 @@ const Settings: React.FC = () => {
     speakText
   } = useAccessibility();
   
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.displayName) {
+      setDisplayName(currentUser.displayName);
+    }
+  }, [currentUser]);
+
   // Function to handle hover/focus text-to-speech
   const handleHover = (text: string) => {
     if (uiTtsEnabled) {
@@ -43,6 +63,55 @@ const Settings: React.FC = () => {
   // Function to handle TTS delay change
   const handleTtsDelayChange = (delay: TtsDelayOption) => {
     setTtsDelay(delay);
+  };
+  
+  const handleUpdateProfile = async () => {
+    if (!displayName.trim()) {
+        toast.error('Display name cannot be empty');
+        return;
+    }
+    setIsUpdating(true);
+    try {
+        await apiService.updateUserProfile({ displayName });
+        if (currentUser) await currentUser.reload();
+        toast.success('Profile updated successfully. Refreshing...');
+        // Reload to update sidebar and global auth state
+        setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+        console.error('Failed to update profile:', error);
+        toast.error('Failed to update profile');
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
+  const handleVerifyEmail = async () => {
+    if (!currentUser || currentUser.emailVerified) return;
+    
+    setIsVerifying(true);
+    try {
+        await apiService.verifyEmail();
+        setVerificationSent(true);
+        toast.success('Verification email sent');
+    } catch (error) {
+        console.error('Failed to send verification email:', error);
+        toast.error('Failed to send verification email');
+    } finally {
+        setIsVerifying(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Are you sure you want to delete your account? This action cannot be undone. All your documents, quizzes, and progress will be permanently deleted.")) {
+        try {
+            await deleteAccount();
+            toast.success('Account deleted successfully');
+            // AuthContext handles the redirect on logout/user null
+        } catch (error) {
+            console.error('Failed to delete account:', error);
+            toast.error('Failed to delete account. Please try logging in again before deleting.');
+        }
+    }
   };
   
   // Function to render delay option button
@@ -351,6 +420,129 @@ const Settings: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Account Management */}
+        <section 
+          className={`p-6 rounded-lg ${highContrast ? 'bg-gray-900' : 'bg-gray-800'}`}
+          onMouseEnter={() => handleHover('Account Management')}
+        >
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <User className="w-5 h-5 mr-2" />
+            Account Management
+          </h2>
+          
+          <div className="space-y-8">
+            {/* Profile Update */}
+            <div className="flex flex-col space-y-4">
+              <h3 
+                className="text-md font-medium"
+                onMouseEnter={() => handleHover('Profile Information')}
+              >
+                Profile Information
+              </h3>
+              
+              <div className="flex flex-col space-y-2 max-w-md">
+                <label className="text-sm text-gray-400" htmlFor="displayName">Display Name</label>
+                <div className="flex gap-2">
+                    <input
+                        id="displayName"
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        className={`flex-1 px-4 py-2 rounded-md ${highContrast ? 'bg-black border border-white text-white' : 'bg-gray-700 text-white border border-gray-600'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        placeholder="Enter your display name"
+                        onMouseEnter={() => handleHover('Enter your display name')}
+                    />
+                    <button
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdating}
+                        className={`px-4 py-2 rounded-md flex items-center ${
+                            highContrast
+                                ? 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                        } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                        onMouseEnter={() => handleHover('Save changes')}
+                    >
+                        <Save className="w-4 h-4 mr-2" />
+                        {isUpdating ? 'Saving...' : 'Save'}
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                    Email: {currentUser?.email} (Cannot be changed)
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-700 pt-6 pb-6">
+              <h3 
+                className="text-md font-medium mb-4"
+                onMouseEnter={() => handleHover('Email Status')}
+              >
+                Email Status
+              </h3>
+              
+              <div className="flex flex-col space-y-2">
+                 {currentUser?.emailVerified ? (
+                    <div className="flex items-center text-green-500 bg-green-500/10 px-3 py-2 rounded-md w-fit">
+                        <BadgeCheck className="w-5 h-5 mr-2" />
+                        <span className="font-medium">Verified</span>
+                    </div>
+                 ) : (
+                    <div className="flex flex-col space-y-3 w-full max-w-md">
+                        <div className={`flex items-center justify-between p-3 rounded-md border ${highContrast ? 'border-white bg-gray-900' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+                            <div className={`flex items-center ${highContrast ? 'text-white' : 'text-yellow-500'}`}>
+                                <Mail className="w-5 h-5 mr-2" />
+                                <span>Not Verified</span>
+                            </div>
+                             {!verificationSent ? (
+                                <button
+                                    onClick={handleVerifyEmail}
+                                    disabled={isVerifying}
+                                    className={`px-3 py-1.5 text-sm rounded-md font-medium ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'} disabled:opacity-50 transition-colors`}
+                                    onMouseEnter={() => handleHover('Send verification email')}
+                                >
+                                    {isVerifying ? 'Sending...' : 'Verify Email'}
+                                </button>
+                             ) : (
+                                <span className="text-sm text-green-400 font-medium flex items-center">
+                                    <BadgeCheck className="w-4 h-4 mr-1" />
+                                    Sent!
+                                </span>
+                             )}
+                        </div>
+                        {verificationSent && (
+                            <p className={`text-sm italic p-3 rounded-md border ${highContrast ? 'text-white border-white' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}>
+                                Verification link sent to {currentUser?.email}. Please check your Inbox and Spam Folder as the sender may be unknown.
+                            </p>
+                        )}
+                    </div>
+                 )}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-700 pt-6">
+                <h3 
+                    className="text-md font-medium text-red-500 flex items-center mb-2"
+                    onMouseEnter={() => handleHover('Danger Zone')}
+                >
+                    <Trash2 className="w-5 h-5 mr-2" />
+                    Danger Zone
+                </h3>
+                <p className="text-sm text-gray-400 mb-4">
+                    Deleting your account is permanent and cannot be undone. All your documents and progress will be lost.
+                </p>
+                
+                <button
+                    onClick={handleDeleteAccount}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center"
+                    onMouseEnter={() => handleHover('Delete Account')}
+                >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Account
+                </button>
             </div>
           </div>
         </section>

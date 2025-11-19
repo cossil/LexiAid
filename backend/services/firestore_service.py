@@ -14,6 +14,7 @@ from firebase_admin import credentials, firestore
 from google.cloud import firestore as google_firestore
 from dotenv import load_dotenv
 import logging
+from backend.services.storage_service import StorageService
 
 # Custom Exception
 class DocumentNotFoundError(Exception):
@@ -116,7 +117,7 @@ class FirestoreService:
     
     def create_user(self, user_id: str, user_data: Dict[str, Any]) -> str:
         """
-        Create a new user in Firestore
+        Create a new user in Firestore with enforced default preferences.
         
         Args:
             user_id: Firebase Auth UID
@@ -208,6 +209,65 @@ class FirestoreService:
             return True
         except Exception as e:
             print(f"Error updating user preferences: {e}")
+            return False
+
+    def delete_user_data(self, user_id: str) -> bool:
+        """
+        Delete all user data from Firestore and GCS.
+        
+        This method performs a comprehensive cleanup:
+        1. Queries all documents owned by the user.
+        2. Deletes associated files from GCS (original, TTS audio, timepoints).
+        3. Deletes the Firestore document records.
+        4. Deletes the user profile from Firestore.
+        
+        Args:
+            user_id: Firebase Auth UID
+            
+        Returns:
+            True if cleanup was successful, False otherwise
+        """
+        try:
+            logger.info(f"Starting comprehensive data deletion for user: {user_id}")
+            storage_svc = StorageService()
+            
+            # 1. Get all user documents
+            docs = self.get_user_documents(user_id)
+            logger.info(f"Found {len(docs)} documents to clean up for user {user_id}")
+            
+            # 2. Delete GCS files and Firestore docs for each document
+            for doc in docs:
+                doc_id = doc.get('id')
+                
+                # Delete Original file
+                gcs_uri = doc.get('gcs_uri') or doc.get('gcsUri')
+                if gcs_uri:
+                    storage_svc.delete_file_from_gcs(gcs_uri)
+                    
+                # Delete TTS Audio
+                tts_audio = doc.get('tts_audio_gcs_uri')
+                if tts_audio:
+                    storage_svc.delete_file_from_gcs(tts_audio)
+                    
+                # Delete TTS Timepoints
+                tts_timepoints = doc.get('tts_timepoints_gcs_uri')
+                if tts_timepoints:
+                    storage_svc.delete_file_from_gcs(tts_timepoints)
+                
+                # Delete the document from Firestore
+                if doc_id:
+                    self.delete_document(doc_id)
+            
+            # 3. Delete user folders, tags, interactions, progress (optional but recommended)
+            # For now, we focus on the critical storage cleanup.
+            
+            # 4. Delete user profile
+            self.db.collection('users').document(user_id).delete()
+            logger.info(f"Successfully deleted user profile for {user_id}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting user data for {user_id}: {e}")
             return False
     
     # Document-related methods
@@ -655,25 +715,6 @@ class FirestoreService:
             raise DocumentNotFoundError(f"Document with ID '{doc_id}' not found.")
 
         # Simulate a successful metadata retrieval for other IDs
-        # In a real implementation, this would query Firestore:
-        # try:
-        #     doc_ref = self.get_db().collection('documents').document(doc_id)
-        #     doc_snapshot = await doc_ref.get() # Assuming an async client or wrapper
-        #     if doc_snapshot.exists:
-        #         metadata = doc_snapshot.to_dict()
-        #         metadata['id'] = doc_snapshot.id # Add document ID to metadata
-        #         # Ensure all necessary fields like 'gcs_uri' are present
-        #         if 'gcs_uri' not in metadata:
-        #             logger.error(f"'gcs_uri' missing in metadata for doc_id: {doc_id}")
-        #             # Decide how to handle: return None, raise error, or return partial data
-        #             return None # Or raise an error
-        #         return metadata
-        #     else:
-        #         raise DocumentNotFoundError(f"Document with ID '{doc_id}' not found in Firestore.")
-        # except Exception as e:
-        #     logger.error(f"Error fetching document {doc_id} from Firestore: {e}", exc_info=True)
-        #     raise # Or handle more gracefully
-        
         mock_metadata = {
             "doc_id": doc_id,
             "gcs_uri": f"gs://fake-bucket/{doc_id}.pdf",

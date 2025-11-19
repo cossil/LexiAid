@@ -17,6 +17,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import { useAuth } from './contexts/AuthContext';
 import { DocumentProvider } from './contexts/DocumentContext'; // Import DocumentProvider
 import QuizProvider from './contexts/QuizContext';
+import { Toaster } from 'react-hot-toast';
 
 // Developer-only import - lazy loaded and excluded from production builds
 const DeprecationShowcase = import.meta.env.DEV 
@@ -190,6 +191,7 @@ function App() {
           {!userHasInteracted && (
             <UserInteractionGateway onInteractionComplete={handleInteractionComplete} />
           )}
+          <Toaster position="top-right" />
           <AppRoutes />
         </AccessibilityProvider>
       </AuthProvider>

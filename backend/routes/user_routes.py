@@ -1,6 +1,206 @@
 from flask import Blueprint, request, jsonify, current_app
+from pydantic import BaseModel, Field, EmailStr, ValidationError, ConfigDict
+from typing import Optional, Literal
 
 user_bp = Blueprint('user_bp', __name__, url_prefix='/api/users')
+
+# --- Pydantic Models ---
+
+class UserPreferences(BaseModel):
+    # Visual Settings
+    fontSize: int = Field(default=16, ge=10, le=32)
+    fontFamily: Literal['OpenDyslexic', 'Inter', 'Arial'] = 'OpenDyslexic'
+    lineSpacing: float = Field(default=1.5, ge=1.0, le=3.0)
+    wordSpacing: float = Field(default=1.2, ge=0.5, le=2.0)
+    textColor: str = Field(default='#000000')
+    backgroundColor: str = Field(default='#f8f9fa')
+    highContrast: bool = False
+    
+    # TTS Settings
+    uiTtsEnabled: bool = True
+    ttsVoice: str = 'en-US-Wavenet-D'
+    ttsSpeed: float = Field(default=1.0, ge=0.5, le=2.0)
+    ttsPitch: float = Field(default=0.0, ge=-20.0, le=20.0)
+    
+    # Cloud TTS Settings (New)
+    cloudTtsEnabled: Optional[bool] = False
+    cloudTtsVoice: Optional[str] = 'en-US-Neural2-F'
+    ttsDelay: Optional[float] = None
+
+    # Answer Formulation Settings (New)
+    answerFormulationAutoPause: Optional[bool] = False
+    answerFormulationPauseDuration: Optional[float] = None
+    answerFormulationSessionsCompleted: Optional[int] = 0
+    answerFormulationAutoPauseSuggestionDismissed: Optional[bool] = False
+    answerFormulationOnboardingCompleted: Optional[bool] = False
+
+class UserCreateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    display_name: Optional[str] = None
+
+class UserUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    display_name: Optional[str] = Field(default=None, alias='displayName')
+    preferences: Optional[UserPreferences] = None
+
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+# --- Routes ---
+
+@user_bp.route('', methods=['POST'])
+def create_user():
+    """Create a new user (Auth + Firestore Profile)"""
+    auth_svc = current_app.config['SERVICES'].get('AuthService')
+    firestore_svc = current_app.config['SERVICES'].get('FirestoreService')
+
+    if not auth_svc or not firestore_svc:
+        return jsonify({'status': 'error', 'message': 'Services unavailable'}), 503
+
+    # 1. Validate Request
+    try:
+        data = UserCreateRequest(**request.json)
+    except ValidationError as e:
+        return jsonify({'status': 'error', 'message': e.errors()}), 400
+
+    # 2. Create in Firebase Auth
+    success, user_id = auth_svc.create_user(
+        email=data.email,
+        password=data.password,
+        display_name=data.display_name
+    )
+
+    if not success:
+        return jsonify({'status': 'error', 'message': 'Failed to create authentication user'}), 500
+
+    # 3. Create in Firestore (Schema Enforcement)
+    try:
+        firestore_svc.create_user(user_id, {
+            'email': data.email,
+            'displayName': data.display_name,
+            # Preferences and gamification defaults are handled by the service
+        })
+    except Exception as e:
+        # Rollback: Delete Auth user if Firestore creation fails
+        auth_svc.delete_user(user_id)
+        return jsonify({'status': 'error', 'message': f'Failed to create user profile: {str(e)}'}), 500
+
+    return jsonify({
+        'status': 'success',
+        'message': 'User created successfully',
+        'userId': user_id
+    }), 201
+
+@user_bp.route('', methods=['DELETE'])
+def delete_user():
+    """Delete user and all associated data (Auth + Firestore + GCS)"""
+    # Verify token
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'status': 'error', 'message': 'No authorization token'}), 401
+
+    auth_svc = current_app.config['SERVICES'].get('AuthService')
+    firestore_svc = current_app.config['SERVICES'].get('FirestoreService')
+
+    if not auth_svc or not firestore_svc:
+        return jsonify({'status': 'error', 'message': 'Services unavailable'}), 503
+
+    # Authenticate
+    success, user_data = auth_svc.verify_id_token(token)
+    if not success or not user_data:
+        return jsonify({'status': 'error', 'message': 'Invalid token'}), 401
+    
+    user_id = user_data['uid']
+
+    # 1. Delete Data (Firestore + GCS)
+    data_deleted = firestore_svc.delete_user_data(user_id)
+    
+    if not data_deleted:
+        # Log error but attempt to continue to Auth deletion to prevent "zombie" accounts
+        print(f"Warning: Partial data deletion failure for user {user_id}")
+
+    # 2. Delete Auth Account
+    auth_deleted = auth_svc.delete_user(user_id)
+
+    if not auth_deleted:
+         return jsonify({'status': 'error', 'message': 'Failed to delete authentication account'}), 500
+
+    return jsonify({'status': 'success', 'message': 'User account and data deleted'}), 200
+
+@user_bp.route('/profile', methods=['PUT'])
+def update_user_profile():
+    """Update user profile (Preferences & Display Name)"""
+    # Verify token
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'status': 'error', 'message': 'No authorization token'}), 401
+
+    auth_svc = current_app.config['SERVICES'].get('AuthService')
+    firestore_svc = current_app.config['SERVICES'].get('FirestoreService')
+
+    if not auth_svc or not firestore_svc:
+        return jsonify({'status': 'error', 'message': 'Services unavailable'}), 503
+
+    # Authenticate
+    success, user_data = auth_svc.verify_id_token(token)
+    if not success or not user_data:
+        return jsonify({'status': 'error', 'message': 'Invalid token'}), 401
+    
+    user_id = user_data['uid']
+
+    # Validate Request
+    try:
+        data = UserUpdateRequest(**request.json)
+        print(f"DEBUG: Received update request: {request.json}")
+        print(f"DEBUG: Parsed Pydantic data: display_name={data.display_name}")
+    except ValidationError as e:
+        return jsonify({'status': 'error', 'message': e.errors()}), 400
+
+    # 1. Update Display Name (if provided)
+    # Manual fallback to ensure 'displayName' from frontend is caught if Pydantic alias fails
+    display_name_to_update = data.display_name
+    if not display_name_to_update and 'displayName' in request.json:
+        display_name_to_update = request.json['displayName']
+        print(f"DEBUG: Using raw displayName from JSON: {display_name_to_update}")
+
+    if display_name_to_update:
+        print(f"DEBUG: Updating Auth User {user_id} with name: {display_name_to_update}")
+        auth_svc.update_user(user_id, {'display_name': display_name_to_update})
+        firestore_svc.update_user(user_id, {'displayName': display_name_to_update})
+
+    # 2. Update Preferences (if provided)
+    if data.preferences:
+        # Dump Pydantic model to dict
+        prefs_dict = data.preferences.model_dump(exclude_unset=True)
+        firestore_svc.update_user_preferences(user_id, prefs_dict)
+
+    return jsonify({'status': 'success', 'message': 'Profile updated'}), 200
+
+@user_bp.route('/verify-email', methods=['POST'])
+def generate_verify_email_link():
+    """Generate email verification link for the authenticated user"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'status': 'error', 'message': 'No authorization token'}), 401
+
+    auth_svc = current_app.config['SERVICES'].get('AuthService')
+    if not auth_svc:
+        return jsonify({'status': 'error', 'message': 'Auth service unavailable'}), 503
+
+    success, user_data = auth_svc.verify_id_token(token)
+    if not success or not user_data:
+        return jsonify({'status': 'error', 'message': 'Invalid token'}), 401
+
+    email = user_data.get('email')
+    if not email:
+        return jsonify({'status': 'error', 'message': 'User has no email'}), 400
+
+    link = auth_svc.generate_email_verification_link(email)
+    if link:
+        return jsonify({'status': 'success', 'link': link}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'Failed to generate link'}), 500
 
 @user_bp.route('/profile', methods=['GET'])
 def get_user_profile():

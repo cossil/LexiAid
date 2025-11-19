@@ -2,17 +2,16 @@ import React, { createContext, useState, useEffect, useContext, useMemo, useCall
 import { 
   User,
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  sendPasswordResetEmail,
-  updateProfile
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '../firebase/config';
+import { apiService } from '../services/api';
 
 // Default user preferences for accessibility
 const DEFAULT_USER_PREFERENCES = {
@@ -60,7 +59,7 @@ export interface UserPreferences {
 
 // Define result type for signup
 interface SignUpResult {
-  user: User;
+  user: User | null;
   partial: boolean;
   error?: string;
 }
@@ -73,6 +72,7 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserPreferences: (preferences: Partial<UserPreferences>) => Promise<void>;
@@ -103,21 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log(`[AuthContext:onAuthStateChanged] User doc found for ${user.uid}. Loading preferences.`);
             const userData = userDoc.data();
             setUserPreferences(userData.preferences || DEFAULT_USER_PREFERENCES);
-            // Update last login asynchronously, don't let it block user setup
-            setDoc(userDocRef, { lastLogin: new Date() }, { merge: true })
-              .catch(err => console.error("[AuthContext] Failed to update lastLogin", err));
+            // Removed direct Firestore write for lastLogin as per backend architecture refactor
           } else {
-            console.warn(`[AuthContext:onAuthStateChanged] User doc for ${user.uid} not found. Creating new doc.`);
-            const newUserDocData = {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || user.email?.split('@')[0],
-              createdAt: new Date(),
-              lastLogin: new Date(),
-              preferences: DEFAULT_USER_PREFERENCES,
-              gamification: { points: 0, streak: 0, level: 1, badges: [] }
-            };
-            await setDoc(userDocRef, newUserDocData);
+            console.warn(`[AuthContext:onAuthStateChanged] User doc for ${user.uid} not found. Using defaults.`);
+            // We do NOT create the doc here anymore. It should have been created by the backend on signup.
+            // If it's missing, it might be a legacy user or sync issue.
             setUserPreferences(DEFAULT_USER_PREFERENCES);
           }
           setCurrentUser(user);
@@ -155,68 +145,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUpCallback = useCallback(async (email: string, password: string, displayName: string): Promise<SignUpResult> => {
-    let userCredential;
-    let firestoreError = false;
     try {
-      console.log('[AuthContext:signUpCallback] Starting user creation in Firebase Auth');
-      userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('[AuthContext:signUpCallback] User created successfully in Firebase Auth');
-      try {
-        console.log('[AuthContext:signUpCallback] Setting displayName in Firebase Auth user profile');
-        await updateProfile(userCredential.user, {
-          displayName: displayName || userCredential.user.email?.split('@')[0]
-        });
-        console.log('[AuthContext:signUpCallback] DisplayName set successfully in Firebase Auth user profile');
-      } catch (profileErr) {
-        console.error('[AuthContext:signUpCallback] Error setting displayName in Firebase Auth:', profileErr);
-      }
-      try {
-        const user = userCredential.user;
-        console.log('[AuthContext:signUpCallback] Attempting to create user document in Firestore');
-        await setDoc(doc(firestore, 'users', user.uid), {
-          uid: user.uid,
-          email: user.email,
-          displayName: displayName || user.email?.split('@')[0],
-          createdAt: new Date(),
-          lastLogin: new Date(),
-          preferences: DEFAULT_USER_PREFERENCES,
-          gamification: { points: 0, streak: 0, level: 1, badges: [] }
-        });
-        console.log('[AuthContext:signUpCallback] User document created successfully in Firestore');
-      } catch (firestoreErr) {
-        console.error('[AuthContext:signUpCallback] Firestore document creation failed:', firestoreErr);
-        firestoreError = true;
-      }
-      if (firestoreError) {
-        return {
-          user: userCredential.user,
-          partial: true,
-          error: 'Created account but failed to set up user profile. Some features may be limited.'
-        };
-      }
+      console.log('[AuthContext:signUpCallback] Starting Server-First user creation');
+      
+      // 1. Create User on Backend (This enforces schema and creates Firestore doc)
+      await apiService.createUser({ 
+        email, 
+        password, 
+        display_name: displayName 
+      });
+      console.log('[AuthContext:signUpCallback] Backend user creation successful');
+
+      // 2. Sign In to establish session
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AuthContext:signUpCallback] User signed in successfully');
+
       return { user: userCredential.user, partial: false };
-    } catch (error) {
-      console.error('[AuthContext:signUpCallback] Firebase Auth signup failed:', error);
-      if (userCredential?.user) {
-        try {
-          console.log('[AuthContext:signUpCallback] Cleaning up auth user after error');
-          await userCredential.user.delete();
-        } catch (deleteError) {
-          console.error('[AuthContext:signUpCallback] Error cleaning up auth user:', deleteError);
-        }
-      }
-      throw error;
+    } catch (error: any) {
+      console.error('[AuthContext:signUpCallback] Signup failed:', error);
+      // Return a structured error
+      return { 
+        user: null, 
+        partial: false, 
+        error: error.response?.data?.message || error.message || 'Signup failed' 
+      };
     }
-  }, []); // Depends on module-level `auth`, `firestore`, `DEFAULT_USER_PREFERENCES`
+  }, []);
 
   const signOutCallback = useCallback(async () => {
     await firebaseSignOut(auth);
   }, []);
 
+  const deleteAccountCallback = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+        console.log('[AuthContext:deleteAccountCallback] Requesting account deletion via API');
+        await apiService.deleteUser();
+        // Force client-side signout just in case
+        await firebaseSignOut(auth);
+        console.log('[AuthContext:deleteAccountCallback] Account deleted successfully');
+    } catch (error) {
+        console.error('[AuthContext:deleteAccountCallback] Error deleting account:', error);
+        throw error;
+    }
+  }, [currentUser]);
+
   const signInWithGoogleCallback = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     try {
       console.log('[AuthContext:signInWithGoogleCallback] Attempting Google Sign-In via popup...');
+      // Note: Google Sign-In currently bypasses our backend creation logic.
+      // Ideally, we should have a backend endpoint to "sync" or "onboard" Google users if they don't exist.
+      // For now, we leave this as is, but it's a known gap for "Backend Schema Ownership" if the trigger isn't set up.
       await signInWithPopup(auth, provider);
       console.log('[AuthContext:signInWithGoogleCallback] Google Sign-In popup initiated successfully.');
     } catch (error: any) {
@@ -232,7 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const resetPasswordCallback = useCallback(async (email: string) => {
+    console.log('[AuthContext:resetPasswordCallback] Sending password reset email via Client SDK');
     await sendPasswordResetEmail(auth, email);
+    console.log('[AuthContext:resetPasswordCallback] Password reset email sent');
   }, []);
 
   const updateUserPreferencesCallback = useCallback(async (preferences: Partial<UserPreferences>) => {
@@ -240,11 +222,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('No user logged in to update preferences');
     }
     const newPreferences = { ...userPreferences, ...preferences };
-    // Ensure getAuthToken is not part of the preferences stored in Firestore
+    // Ensure getAuthToken is not part of the preferences sent to API
     const { getAuthToken, ...prefsToStore } = newPreferences;
-    await setDoc(doc(firestore, 'users', currentUser.uid), { preferences: prefsToStore }, { merge: true });
-    setUserPreferences(newPreferences); // Update local state with the full newPreferences object (including getAuthToken method)
-    console.log('[AuthContext:updateUserPreferencesCallback] User preferences updated.');
+    
+    try {
+        await apiService.updateUserProfile({ preferences: prefsToStore });
+        setUserPreferences(newPreferences); // Update local state
+        console.log('[AuthContext:updateUserPreferencesCallback] User preferences updated via API.');
+    } catch (error) {
+        console.error('[AuthContext:updateUserPreferencesCallback] Failed to update preferences:', error);
+        // We might want to throw here so the UI knows it failed
+        throw error; 
+    }
   }, [currentUser, userPreferences]);
 
   const enhancedPreferences = useMemo(() => ({
@@ -259,6 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn: signInCallback,
     signUp: signUpCallback,
     signOut: signOutCallback,
+    deleteAccount: deleteAccountCallback,
     signInWithGoogle: signInWithGoogleCallback,
     resetPassword: resetPasswordCallback,
     updateUserPreferences: updateUserPreferencesCallback,
@@ -270,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInCallback,
     signUpCallback,
     signOutCallback,
+    deleteAccountCallback,
     signInWithGoogleCallback,
     resetPasswordCallback,
     updateUserPreferencesCallback,

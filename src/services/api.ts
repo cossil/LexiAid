@@ -256,9 +256,30 @@ export const apiService = {
     displayName?: string;
     preferences?: Record<string, any>;
   }): Promise<void> {
-    await api.patch('/api/users/profile', updates);
+    // Updated to use PUT as standardized in backend
+    await api.put('/api/users/profile', updates);
   },
-  
+
+  // NEW: Create User (Server-First)
+  async createUser(payload: { email: string; password: string; display_name: string }): Promise<{
+    userId: string;
+    message: string;
+  }> {
+    const response = await api.post('/api/users', payload);
+    return response.data;
+  },
+
+  // NEW: Delete User
+  async deleteUser(): Promise<void> {
+    await api.delete('/api/users');
+  },
+
+  // NEW: Verify Email
+  async verifyEmail(): Promise<{ link: string }> {
+    const response = await api.post('/api/users/verify-email');
+    return response.data;
+  },
+
   // Start a quiz
   async startQuiz(documentId: string, threadId?: string | null): Promise<{
     agent_response: string;

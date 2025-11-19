@@ -184,7 +184,7 @@ const DashboardLayout: React.FC = () => {
                 <User className="w-6 h-6" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium">{currentUser?.email}</p>
+                <p className="text-sm font-medium">{currentUser?.displayName || currentUser?.email}</p>
                 <p className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Student</p>
               </div>
             </div>
@@ -266,7 +266,7 @@ const DashboardLayout: React.FC = () => {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm font-medium truncate max-w-[140px]">
-                      {currentUser?.email}
+                      {currentUser?.displayName || currentUser?.email}
                     </p>
                     <p className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Student</p>
                   </div>
