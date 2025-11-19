@@ -146,6 +146,14 @@ export const apiService = {
     };
   },
 
+  // Get conversation history for a thread
+  async getChatHistory(threadId: string): Promise<any[]> {
+    const response = await api.get('/api/v2/agent/history', {
+      params: { thread_id: threadId }
+    });
+    return response.data.conversation_history || [];
+  },
+
   async synthesizeText(text: string): Promise<{
     audioContent: string;
     timepoints: any[];

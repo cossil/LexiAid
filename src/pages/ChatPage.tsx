@@ -34,10 +34,50 @@ const ChatPage: React.FC = () => {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const [threadId, setThreadId] = useState<string | undefined>(() => {
+    const stored = localStorage.getItem('active_chat_thread_id');
+    return stored || undefined;
+  });
   const [document, setDocument] = useState<{ id: string; name: string } | null>(null);
   const [isQuiz, setIsQuiz] = useState<boolean>(false);
   const quizInitializationAttempted = useRef(false);
+
+  useEffect(() => {
+    if (threadId) {
+      localStorage.setItem('active_chat_thread_id', threadId);
+    }
+  }, [threadId]);
+
+  useEffect(() => {
+    const restoreHistory = async () => {
+      if (threadId && messages.length === 0) {
+        setIsLoading(true);
+        try {
+          const historyMessages = await apiService.getChatHistory(threadId);
+          
+          if (historyMessages && historyMessages.length > 0) {
+            const restoredMessages: ChatMessage[] = historyMessages.map((msg, index) => ({
+              id: `history-${index}-${Date.now()}`,
+              text: msg.content,
+              sender: msg.type === 'human' ? 'user' : 'agent',
+              timestamp: new Date().toISOString(),
+              thread_id: threadId,
+              document_id: documentIdFromUrl
+            }));
+            setMessages(restoredMessages);
+          }
+        } catch (error) {
+          console.error('Failed to restore history:', error);
+          localStorage.removeItem('active_chat_thread_id');
+          setThreadId(undefined);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    restoreHistory();
+  }, [threadId, documentIdFromUrl]);
 
   useEffect(() => {
     const fetchDocumentDetails = () => {
@@ -109,95 +149,6 @@ const ChatPage: React.FC = () => {
       handleStartQuiz();
     }
   }, [location.search, documentIdFromUrl, handleStartQuiz]);
-
-  const handleAudioSend = useCallback((audioBlob: Blob, transcript?: string) => {
-    const userMessageId = `user-audio-${Date.now()}`;
-    const userMessageText = transcript || 'Processing audio input...';
-    const userMsgObject: ChatMessage = {
-      id: userMessageId,
-      text: userMessageText,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-      isQuizQuestion: isQuiz,
-      isPending: true,
-      document_id: documentIdFromUrl || undefined,
-      thread_id: threadId || undefined,
-    };
-
-    setMessages(prev => [...prev, userMsgObject]);
-    setIsLoading(true);
-
-    const sendAudioAsync = async () => {
-      try {
-        const formData = new FormData();
-        formData.append('audio_file', audioBlob, 'recording.webm');
-        if (documentIdFromUrl) {
-          formData.append('document_id', documentIdFromUrl);
-        }
-        if (threadId) {
-          formData.append('thread_id', threadId);
-        }
-        if (transcript) {
-          formData.append('transcript', transcript); // Send transcript if available
-        }
-
-        // Use apiService.uploadAudioMessage which is expected to handle FormData
-        // The response type from uploadAudioMessage might be different from ChatApiResponse,
-        // so we'll call it rawApiResponse and then map its fields.
-        const rawApiResponse = await apiService.uploadAudioMessage(formData /*, { sttProcessingMode: 'direct_send' } // Optional: if API needs mode */);
-
-        if (rawApiResponse.error) {
-          throw new Error(rawApiResponse.error);
-        }
-
-        if (rawApiResponse.thread_id && !threadId) {
-          setThreadId(rawApiResponse.thread_id);
-        }
-
-        // Update the user message: set isPending to false and use the final transcript from response if available
-        const confirmedUserText = rawApiResponse.transcript || userMessageText;
-        setMessages(prev => prev.map(m =>
-          m.id === userMessageId ? { ...m, isPending: false, text: confirmedUserText, thread_id: rawApiResponse.thread_id || threadId } : m
-        ));
-
-        const aiMessageText = rawApiResponse.response || rawApiResponse.text || "Sorry, I couldn't process that.";
-        const aiResponse: ChatMessage = {
-          id: `ai-audio-response-${Date.now()}`,
-          text: aiMessageText, // Mapped from rawApiResponse.response or rawApiResponse.text
-          sender: 'agent',
-          timestamp: new Date().toISOString(),
-          isQuizQuestion: rawApiResponse.quiz_active || false, // Mapped from rawApiResponse.quiz_active
-          // options: rawApiResponse.options || undefined, // uploadAudioMessage might not return options
-          document_id: documentIdFromUrl || undefined,
-          thread_id: rawApiResponse.thread_id || threadId || undefined,
-          // audio_content_base64: rawApiResponse.audio_content_base64 || null, // uploadAudioMessage might not return this
-        };
-        setMessages(prev => [...prev, aiResponse]);
-
-        if (rawApiResponse.quiz_active) {
-          setIsQuiz(true);
-        }
-
-      } catch (error: any) {
-        console.error('Error sending audio message:', error);
-        toast.error(error.message || 'Failed to send audio message.');
-        setMessages(prev => prev.map(m => m.id === userMessageId ? { ...m, isPending: false, isError: true, text: userMessageText } : m));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    sendAudioAsync().catch(err => {
-      // Catch errors from the async IIFE if not handled internally, though internal handling is preferred.
-      console.error("Error in sendAudioAsync execution:", err);
-      // Ensure loading is false and user message reflects error if not already done
-      setIsLoading(false);
-      setMessages(prev => prev.map(m => 
-        m.id === userMessageId && m.isPending ? { ...m, isPending: false, isError: true, text: userMessageText } : m
-      ));
-    });
-
-  }, [documentIdFromUrl, threadId, isQuiz, setMessages, setIsLoading, setThreadId, setIsQuiz, toast]);
 
   const handleSendMessage = useCallback(async (messageText: string) => {
     const userMessageId = `user-text-${Date.now()}`;
@@ -290,8 +241,6 @@ const ChatPage: React.FC = () => {
           messages={messages}
           isSendingMessage={isLoading}
           onSendMessage={handleSendMessage}
-          onAudioSend={handleAudioSend}
-          onAudioError={(errMsg) => toast.error(errMsg)}
           onStartQuiz={handleStartQuiz}
           currentDocumentId={documentIdFromUrl}
           currentThreadId={threadId}

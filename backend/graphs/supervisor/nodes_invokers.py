@@ -79,6 +79,28 @@ def invoke_new_chat_graph_node(state: SupervisorState, graph_instance: Any) -> d
         if response_state:
             updates["final_agent_response"] = response_state.get("response")
             updated_history = response_state.get("messages", [])
+            
+            # Ensure the AI response is added to history if not present
+            if updates["final_agent_response"]:
+                should_append = False
+                if not updated_history:
+                    should_append = True
+                else:
+                    last_msg = updated_history[-1]
+                    # Check if last message is AI and has the same content
+                    is_ai = isinstance(last_msg, AIMessage) or (isinstance(last_msg, dict) and last_msg.get("type") == "ai")
+                    if not is_ai:
+                        should_append = True
+                    elif isinstance(last_msg, AIMessage) and last_msg.content != updates["final_agent_response"]:
+                        # Content mismatch - maybe it was a partial stream or tool output? Safe to append final.
+                         should_append = True
+                    elif isinstance(last_msg, dict) and last_msg.get("data", {}).get("content") != updates["final_agent_response"]:
+                         should_append = True
+
+                if should_append:
+                    print("[Supervisor] Appending final agent response to conversation history.")
+                    updated_history.append(AIMessage(content=updates["final_agent_response"]))
+
             if updated_history:
                  # Serialize messages before storing in supervisor state
                  updates["conversation_history"] = serialize_messages(updated_history)

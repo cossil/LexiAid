@@ -4,8 +4,7 @@ import { Send, Volume2, VolumeX, Loader2, Mic, StopCircle, Play } from 'lucide-r
 import useRealtimeStt, { SttStatus } from '../hooks/useRealtimeStt';
 import styles from './GeminiChatInterface.module.css';
 import { ChatMessage, Timepoint } from '../types/document'; // Assuming Timepoint type is defined in types
-import { useChatTTSPlayer } from '../hooks/useChatTTSPlayer';
-import { useOnDemandTTSPlayer } from '../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer, PlayerStatus } from '../hooks/useTTSPlayer';
 
 // ... (Keep the GeminiChatInterfaceProps interface as is)
 interface GeminiChatInterfaceProps {
@@ -26,7 +25,8 @@ interface MessageBubbleProps {
   isPlaying: boolean;
   isLoading: boolean;
   activeTimepoint: Timepoint | null;
-  onDemandWordTimepoints?: Timepoint[] | null; // New prop for user message timepoints
+  timepoints?: Timepoint[] | null;
+  forceTimepointRenderer?: boolean;
   onWordClick?: (timeInSeconds: number) => void;
 }
 
@@ -38,7 +38,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isPlaying,
   isLoading,
   activeTimepoint,
-  onDemandWordTimepoints,
+  timepoints,
+  forceTimepointRenderer,
   onWordClick,
 }) => {
   const handleRetry = () => {
@@ -98,8 +99,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
       <div className={styles.markdownContent}>
         {(() => {
-          const timepointsToUse = message.sender === 'agent' ? message.timepoints : onDemandWordTimepoints;
-          const useTimepointRenderer = timepointsToUse && timepointsToUse.length > 0;
+          const timepointsToUse = timepoints || [];
+          const hasTimepoints = timepointsToUse.length > 0;
+          const useTimepointRenderer = (forceTimepointRenderer && hasTimepoints) || hasTimepoints;
 
           if (useTimepointRenderer) {
             return (
@@ -107,7 +109,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {groupTimepointsIntoParagraphs(timepointsToUse).map((paragraph, pIndex) => (
                   <p key={pIndex} className="mb-4 last:mb-0">
                     {paragraph.map((timepoint, wIndex) => {
-                      const isHighlighted = isPlaying && activeTimepoint?.time_seconds === timepoint.time_seconds;
+                      const isHighlighted =
+                        isPlaying &&
+                        activeTimepoint &&
+                        activeTimepoint.time_seconds === timepoint.time_seconds &&
+                        activeTimepoint.mark_name === timepoint.mark_name;
                       return (
                         <span
                           key={`${pIndex}-${wIndex}`}
@@ -151,17 +157,17 @@ interface ChatInputBarProps {
   isSendingMessage: boolean;
   currentDocumentId?: string | null;
   currentThreadId?: string | null;
-  playText: (text: string) => void;
-  stopAudio: () => void;
-  onDemandStatus: 'idle' | 'loading' | 'playing' | 'error' | 'paused';
+  onPreviewPlay: (text: string) => Promise<void> | void;
+  onPreviewStop: () => void;
+  previewStatus: PlayerStatus;
 }
 
 const ChatInputBar: React.FC<ChatInputBarProps> = ({
   onSendMessage,
   isSendingMessage,
-  playText,
-  stopAudio,
-  onDemandStatus,
+  onPreviewPlay,
+  onPreviewStop,
+  previewStatus,
 }) => {
   const { status, transcript, startDictation, stopDictation, stopAndPlay, updateTranscript } = useRealtimeStt();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -179,8 +185,8 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
   const handleSend = () => {
     if (combinedTranscript.trim()) {
       // Stop any ongoing TTS playback before sending
-      if (onDemandStatus === 'playing' || onDemandStatus === 'loading') {
-        stopAudio();
+      if (previewStatus === 'playing' || previewStatus === 'loading') {
+        onPreviewStop();
       }
       onSendMessage(combinedTranscript.trim());
       updateTranscript(''); // Clear transcript after sending
@@ -250,7 +256,7 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
         // Play typed text
         if (text) {
           console.log('Playing typed text');
-          playText(text);
+          onPreviewPlay(text);
         }
         break;
         
@@ -263,7 +269,7 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
           // Delay to ensure state transition completes
           setTimeout(() => {
             console.log('Playing transcript after stop, length:', transcriptToPlay.length);
-            playText(transcriptToPlay);
+            onPreviewPlay(transcriptToPlay);
             setIsTransitioning(false);
           }, 150);
         } else {
@@ -276,7 +282,7 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
         // Play transcribed text
         if (text) {
           console.log('Playing transcribed text');
-          playText(text);
+          onPreviewPlay(text);
         }
         break;
         
@@ -288,7 +294,7 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
       default:
         console.warn('Unexpected status for Play button:', status);
     }
-  }, [status, combinedTranscript, playText, stopAndPlay, isTransitioning]);
+  }, [status, combinedTranscript, onPreviewPlay, stopAndPlay, isTransitioning]);
 
   // Handler: Microphone button click with state-aware behavior
   const handleMicrophoneClick = useCallback(() => {
@@ -316,14 +322,14 @@ const ChatInputBar: React.FC<ChatInputBarProps> = ({
       {/* Left side: Play/Stop button - ALWAYS VISIBLE */}
       <div className={styles.leftControls}>
         {/* TTS Playback Button */}
-        {onDemandStatus === 'playing' || onDemandStatus === 'loading' ? (
+        {previewStatus === 'playing' || previewStatus === 'loading' ? (
           <button 
-            onClick={stopAudio} 
+            onClick={onPreviewStop} 
             className={styles.reviewButton} 
             title="Stop playback"
             aria-label="Stop audio playback"
           >
-            {onDemandStatus === 'loading' 
+            {previewStatus === 'loading' 
               ? <Loader2 size={20} className="animate-spin" /> 
               : <VolumeX size={20} />
             }
@@ -403,61 +409,58 @@ const GeminiChatInterface: React.FC<GeminiChatInterfaceProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
-    playAudio,
-    stopAudio,
-    seekAndPlay: seekAgentAudio,
-    status: agentStatus,
-    activeTimepoint: agentActiveTimepoint,
-    error: ttsError
-  } = useChatTTSPlayer();
+    playAudio: playMessageAudio,
+    stopAudio: stopMessageAudio,
+    seekAndPlay: seekMessageAudio,
+    status: messageStatus,
+    activeTimepoint: messageActiveTimepoint,
+    wordTimepoints: messageWordTimepoints,
+    error: messageTtsError
+  } = useTTSPlayer(currentDocumentId || null);
   const {
-    playText: playOnDemandText,
-    stopAudio: stopOnDemandAudio,
-    seekAndPlay: seekOnDemandAudio,
-    status: onDemandStatus,
-    activeTimepoint: onDemandActiveTimepoint,
-    wordTimepoints: onDemandWordTimepoints
-  } = useOnDemandTTSPlayer();
+    playAudio: playPreviewAudio,
+    stopAudio: stopPreviewAudio,
+    status: previewStatus,
+  } = useTTSPlayer(null);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
 
   const handleWordClick = (message: ChatMessage, timeInSeconds: number) => {
     if (playingMessageId !== message.id) return; // Only seek on the currently playing message
-
-    if (message.sender === 'agent') {
-      seekAgentAudio(timeInSeconds);
-    } else if (message.sender === 'user' && message.text) {
-      seekOnDemandAudio(timeInSeconds, message.text);
-    }
+    seekMessageAudio(timeInSeconds);
   };
 
-  const handlePlayAudio = useCallback((message: ChatMessage) => {
+  const handlePlayAudio = useCallback(async (message: ChatMessage) => {
     if (playingMessageId === message.id) {
-      stopAudio();
-      stopOnDemandAudio();
+      stopMessageAudio();
       setPlayingMessageId(null);
-    } else {
-      stopAudio();
-      stopOnDemandAudio();
-      setPlayingMessageId(message.id);
-      if (message.sender === 'agent' && message.audio_content_base64 && message.timepoints) {
-        playAudio(message.audio_content_base64, message.timepoints);
-      } else if (message.sender === 'user' && message.text) {
-        playOnDemandText(message.text);
-      } else {
-        console.error('No audio content or text to play for message:', message.id);
-        setPlayingMessageId(null);
-      }
+      return;
     }
-  }, [playAudio, stopAudio, playingMessageId, playOnDemandText, stopOnDemandAudio]);
+
+    stopMessageAudio();
+    setPlayingMessageId(message.id);
+
+    try {
+      if (message.audio_content_base64 && message.timepoints && message.timepoints.length > 0) {
+        await playMessageAudio({ audioContent: message.audio_content_base64, timepoints: message.timepoints });
+      } else if (message.text) {
+        await playMessageAudio({ text: message.text });
+      } else {
+        throw new Error('No audio content or text to play.');
+      }
+    } catch (err) {
+      console.error('Error playing message audio:', err);
+      setPlayingMessageId(null);
+    }
+  }, [playMessageAudio, stopMessageAudio, playingMessageId]);
 
   useEffect(() => {
-    if (agentStatus === 'idle' && onDemandStatus === 'idle') {
+    if (messageStatus === 'idle') {
       setPlayingMessageId(null);
     }
-    if (ttsError) {
-      console.error("TTS Playback Error:", ttsError);
+    if (messageTtsError) {
+      console.error('TTS Playback Error:', messageTtsError);
     }
-  }, [agentStatus, onDemandStatus, ttsError]);
+  }, [messageStatus, messageTtsError]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -476,10 +479,11 @@ const GeminiChatInterface: React.FC<GeminiChatInterfaceProps> = ({
       <div className={styles.messagesArea}>
         {messages.map((msg) => {
           const isPlayingThisMessage = playingMessageId === msg.id;
-          let bubbleActiveTimepoint = null;
-          if (isPlayingThisMessage) {
-            bubbleActiveTimepoint = msg.sender === 'agent' ? agentActiveTimepoint : onDemandActiveTimepoint;
-          }
+          const bubbleActiveTimepoint = isPlayingThisMessage ? (messageActiveTimepoint as Timepoint | null) : null;
+          const bubbleTimepoints = isPlayingThisMessage
+            ? (messageWordTimepoints as Timepoint[] | null)
+            : (msg.timepoints as Timepoint[] | undefined) || null;
+          const forceRenderer = isPlayingThisMessage && (messageStatus === 'playing' || messageStatus === 'loading' || messageStatus === 'paused');
 
           return (
             <MessageBubble
@@ -488,24 +492,25 @@ const GeminiChatInterface: React.FC<GeminiChatInterfaceProps> = ({
               onRetrySend={msg.sender === 'user' ? handleRetrySendMessage : undefined}
               onSendMessage={onSendMessage}
               onPlayAudio={handlePlayAudio}
-              isPlaying={isPlayingThisMessage && (agentStatus === 'playing' || agentStatus === 'paused' || onDemandStatus === 'playing')}
-              isLoading={isPlayingThisMessage && (agentStatus === 'loading' || onDemandStatus === 'loading')}
+              isPlaying={isPlayingThisMessage && (messageStatus === 'playing' || messageStatus === 'paused')}
+              isLoading={isPlayingThisMessage && messageStatus === 'loading'}
               activeTimepoint={bubbleActiveTimepoint}
-              onDemandWordTimepoints={isPlayingThisMessage && msg.sender === 'user' ? onDemandWordTimepoints : null}
+              timepoints={bubbleTimepoints}
+              forceTimepointRenderer={forceRenderer}
               onWordClick={isPlayingThisMessage ? (time) => handleWordClick(msg, time) : undefined}
             />
           );
         })}
         <div ref={messagesEndRef} />
       </div>
-                  <ChatInputBar
+      <ChatInputBar
         onSendMessage={(text: string) => onSendMessage(text)}
         isSendingMessage={isSendingMessage}
         currentDocumentId={currentDocumentId}
         currentThreadId={currentThreadId}
-        playText={playOnDemandText}
-        stopAudio={stopOnDemandAudio}
-        onDemandStatus={onDemandStatus}
+        onPreviewPlay={(text) => playPreviewAudio({ text })}
+        onPreviewStop={stopPreviewAudio}
+        previewStatus={previewStatus}
       />
     </div>
   );

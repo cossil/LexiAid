@@ -25,12 +25,14 @@ print("--- DIAGNOSTIC: END ---")
 # END DIAGNOSTIC CODE
 
 
+import io
 import os
 import re
 import logging
 from google.cloud import texttospeech_v1beta1 as texttospeech
 from google.oauth2 import service_account
 from dotenv import load_dotenv
+from pydub import AudioSegment
 from backend.utils.text_utils import sanitize_text_for_tts
 
 # Load environment variables
@@ -223,7 +225,7 @@ class TTSService:
         return chunks
 
     def synthesize_text(self, text, voice_name=None, speaking_rate=None, pitch=None,
-                     audio_encoding=texttospeech.AudioEncoding.MP3,
+                     audio_encoding=texttospeech.AudioEncoding.LINEAR16,
                      sample_rate_hertz=None):
         """
         Converts text to speech using Google Cloud TTS API, with support for chunking
@@ -353,9 +355,8 @@ class TTSService:
         
         
         # Process each chunk and aggregate results
-        audio_chunks = []
+        combined_audio_segment = AudioSegment.empty()
         timepoint_chunks = []
-        total_duration_ms = 0
         
         language_code = "-".join(final_voice_name.split('-')[0:2])
         voice = texttospeech.VoiceSelectionParams(
@@ -363,8 +364,9 @@ class TTSService:
             name=final_voice_name
         )
         
+        # Force LINEAR16 for precise PCM chunk measurement regardless of caller input
         audio_config_params = {
-            "audio_encoding": audio_encoding,
+            "audio_encoding": texttospeech.AudioEncoding.LINEAR16,
             "speaking_rate": final_speaking_rate,
             "pitch": final_pitch
         }
@@ -396,6 +398,10 @@ class TTSService:
                 response = self.client.synthesize_speech(request=request)
                 logging.debug(f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] API call successful. Received {len(response.audio_content)} bytes of audio.")
                 
+                # Decode LINEAR16 (WAV) chunk to maintain exact PCM timing
+                chunk_audio = AudioSegment.from_wav(io.BytesIO(response.audio_content))
+                real_duration_ms = len(chunk_audio)
+
                 # Process timepoints for this chunk
                 chunk_timepoints = []
                 paragraph_markers_found = 0
@@ -404,6 +410,9 @@ class TTSService:
                 # Log timepoints from response
                 logging.debug(f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Processing {len(response.timepoints)} timepoints")
                 
+                # Determine the current offset from the already stitched audio
+                current_offset_ms = len(combined_audio_segment)
+
                 for tp_index, tp in enumerate(response.timepoints):
                     # Log every 100th timepoint and first/last few
                     if tp_index % 100 == 0 or tp_index < 5 or tp_index >= len(response.timepoints) - 5:
@@ -411,7 +420,7 @@ class TTSService:
                     
                     text_part = marks_to_text_map.get(tp.mark_name, '')
                     # Adjust timepoint by adding the total duration so far
-                    adjusted_time = tp.time_seconds + (total_duration_ms / 1000.0)
+                    adjusted_time = tp.time_seconds + (current_offset_ms / 1000.0)
                     
                     # Check if this is a paragraph break marker
                     if text_part == "PARAGRAPH_BREAK":
@@ -434,32 +443,38 @@ class TTSService:
                         if regular_markers_found % 100 == 0 or regular_markers_found < 5 or len(text_part) > 20:
                             logging.debug(f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Word marker: '{text_part}' at {adjusted_time:.3f}s")
                 
-                logging.debug(f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Processed {paragraph_markers_found} paragraph breaks and {regular_markers_found} regular markers")
+                last_chunk_timepoint_ms = 0
+                if response.timepoints:
+                    last_chunk_timepoint_ms = response.timepoints[-1].time_seconds * 1000
+                logging.debug(
+                    f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Processed {paragraph_markers_found} paragraph breaks and {regular_markers_found} regular markers"
+                )
+                logging.debug(
+                    f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Offset={current_offset_ms}ms, MeasuredDuration={real_duration_ms}ms, LastTimepoint={last_chunk_timepoint_ms:.1f}ms"
+                )
+                if real_duration_ms - last_chunk_timepoint_ms > 150:
+                    logging.warning(
+                        f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Detected {real_duration_ms - last_chunk_timepoint_ms:.1f}ms of trailing silence/padding; consider trimming."
+                    )
                 
                 # Add this chunk's results to our aggregated results
-                audio_chunks.append(response.audio_content)
+                combined_audio_segment += chunk_audio
                 timepoint_chunks.extend(chunk_timepoints)
-                
-                # Calculate audio duration for this chunk (rough estimate if not available)
-                # For MP3, approximately 1 byte per 8 samples at 24kHz
-                if hasattr(response, 'audio_duration'):
-                    chunk_duration_ms = response.audio_duration.total_seconds() * 1000
-                else:
-                    # Rough estimate based on speaking rate and text length
-                    words_per_minute = 150 * final_speaking_rate  # Average speaking rate
-                    words_in_chunk = len(chunk.split())
-                    chunk_duration_ms = (words_in_chunk / words_per_minute) * 60 * 1000
-                
-                total_duration_ms += chunk_duration_ms
             
-            # Combine all audio chunks into a single bytes object
-            combined_audio = b''.join(audio_chunks)
+            # Export the stitched audio to a clean MP3 byte stream
+            buffer = io.BytesIO()
+            combined_audio_segment.export(buffer, format="mp3")
+            buffer.seek(0)
+            final_audio_bytes = buffer.getvalue()
             
-            print(f"TTS successfully synthesized {len(combined_audio)} bytes with {len(timepoint_chunks)} timepoints across {len(chunks)} chunks.")
-            logging.debug(f"TTS_TRACE: Exiting synthesize_text. Processed {len(audio_chunks)} chunks. Total audio size: {len(combined_audio)} bytes. Total timepoints: {len(timepoint_chunks)}")
+            print(f"TTS successfully synthesized {len(final_audio_bytes)} bytes with {len(timepoint_chunks)} timepoints across {len(chunks)} chunks.")
+            logging.debug(
+                f"TTS_TRACE: Exiting synthesize_text. Processed {len(chunks)} chunks. Total audio size: {len(final_audio_bytes)} bytes. "
+                f"Total timepoints: {len(timepoint_chunks)}"
+            )
             
             return {
-                "audio_content": combined_audio,
+                "audio_content": final_audio_bytes,
                 "timepoints": timepoint_chunks
             }
         except Exception as e:

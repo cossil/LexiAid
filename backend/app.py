@@ -10,6 +10,7 @@ import sys
 
 import atexit
 import logging
+logging.basicConfig(level=logging.INFO)
 from typing import Set, Optional
 from flask import current_app
 
@@ -27,17 +28,17 @@ import io
 # Construct the path to .env in the same directory as app.py
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if load_dotenv(dotenv_path):
-    print(f"--- app.py --- Successfully loaded .env file from: {dotenv_path}")
-    print(f"--- app.py (after load_dotenv) --- GOOGLE_CLOUD_PROJECT_ID: {os.getenv('GOOGLE_CLOUD_PROJECT_ID')}")
-    print(f"--- app.py (after load_dotenv) --- DOCUMENT_AI_LOCATION: {os.getenv('DOCUMENT_AI_LOCATION')}")
-    print(f"--- app.py (after load_dotenv) --- LAYOUT_PROCESSOR_ID: {os.getenv('LAYOUT_PROCESSOR_ID')}")
+    logging.info(f"--- app.py --- Successfully loaded .env file from: {dotenv_path}")
+    logging.info(f"--- app.py (after load_dotenv) --- GOOGLE_CLOUD_PROJECT_ID: {os.getenv('GOOGLE_CLOUD_PROJECT_ID')}")
+    logging.info(f"--- app.py (after load_dotenv) --- DOCUMENT_AI_LOCATION: {os.getenv('DOCUMENT_AI_LOCATION')}")
+    logging.info(f"--- app.py (after load_dotenv) --- LAYOUT_PROCESSOR_ID: {os.getenv('LAYOUT_PROCESSOR_ID')}")
 else:
-    print(f"--- app.py --- .env file not found at: {dotenv_path} or failed to load.")
+    logging.warning(f"--- app.py --- .env file not found at: {dotenv_path} or failed to load.")
 # --- End of .env loading ---
 
 import logging
-print(f"--- app.py --- SYS.PATH: {sys.path}")
-print(f"--- app.py --- CWD: {os.getcwd()}")
+logging.info(f"--- app.py --- SYS.PATH: {sys.path}")
+logging.info(f"--- app.py --- CWD: {os.getcwd()}")
 import sqlite3 # Added to resolve NameError for checkpointer initialization
 # import sys # sys is already imported
 import json
@@ -96,9 +97,8 @@ CORS(app,
      allow_headers=["*"])
 
 # Configure logging
-if not app.debug and not app.testing:
-    pass # Add pass to fix indentation error, logging setup can be added later if needed
-    # ... (logging setup remains the same)
+logging.basicConfig(level=logging.INFO)
+app.logger.setLevel(logging.INFO)
 
 # --- Service and Tool Initialization --- 
 
@@ -107,10 +107,10 @@ def initialize_component(component_class, component_name, app_config_key, **kwar
     try:
         instance = component_class(**kwargs)
         app.config[app_config_key][component_name] = instance
-        print(f"{component_name} initialized successfully.")
+        app.logger.info(f"{component_name} initialized successfully.")
         return instance
     except Exception as e:
-        print(f"Error initializing {component_name}: {e}")
+        app.logger.error(f"Error initializing {component_name}: {e}")
         app.config[app_config_key][component_name] = None
         return None
 
@@ -122,7 +122,7 @@ with app.app_context():
     try:
         import backend.diagnostics.langgraph_patch  # noqa
         logging.info("LangGraph diagnostics patch activated")
-        print("[LangGraph Patch] Deep serialization & SqliteSaver monkeypatch ACTIVE")
+        app.logger.info("[LangGraph Patch] Deep serialization & SqliteSaver monkeypatch ACTIVE")
     except Exception as e:
         logging.warning("LangGraph diagnostics patch not loaded: %s", e)
 
@@ -155,7 +155,7 @@ with app.app_context():
         if doc_retrieval_service:
             app.config['DOC_RETRIEVAL_SERVICE'] = doc_retrieval_service
     else:
-        print("DocumentRetrievalService cannot be initialized due to missing Firestore or Storage service.")
+        app.logger.error("DocumentRetrievalService cannot be initialized due to missing Firestore or Storage service.")
         app.config['SERVICES']['DocRetrievalService'] = None
         doc_retrieval_service = None # ensure it's defined as None
 
@@ -180,7 +180,7 @@ def require_auth(f):
         token = auth_header.split('Bearer ')[1]
         auth_service = current_app.config.get('AUTH_SERVICE')
         if not auth_service:
-            print("ERROR: Authentication service not available in app config")
+            current_app.logger.error("ERROR: Authentication service not available in app config")
             return jsonify({"error": "Authentication service not available", "code": "AUTH_SERVICE_UNAVAILABLE"}), 500
 
         try:
@@ -190,7 +190,7 @@ def require_auth(f):
                 # AuthService.verify_id_token would have printed specific error (expired, invalid, etc.)
                 # The 'details' in the jsonify below will be whatever exception string is caught if any other exception occurs.
                 # Or we can make it more generic if AuthService handles all specific error messages itself.
-                print(f"DEBUG: AuthService.verify_id_token returned success={success}, token_data present={token_data is not None}")
+                current_app.logger.debug(f"DEBUG: AuthService.verify_id_token returned success={success}, token_data present={token_data is not None}")
                 return jsonify({"error": "Invalid or expired token", "details": "Token verification failed by auth service.", "code": "INVALID_TOKEN_AUTH_SERVICE"}), 401
 
             # Firebase typically uses 'uid' for user ID in the decoded token claims.
@@ -198,14 +198,14 @@ def require_auth(f):
             user_id = token_data.get('uid')
             
             if not user_id:
-                print(f"ERROR: User ID ('uid') not found in verified token data: {token_data}")
+                current_app.logger.error(f"ERROR: User ID ('uid') not found in verified token data: {token_data}")
                 return jsonify({"error": "User ID not found in token claims", "code": "USER_ID_NOT_IN_TOKEN_CLAIMS"}), 401
             
             g.user_id = user_id # Store user_id in Flask's g object for the request context
         except Exception as e:
             # This catch block is more for unexpected errors during the call or unpacking,
             # as AuthService is expected to catch specific Firebase auth exceptions.
-            print(f"ERROR: Unexpected issue during token verification process: {e}")
+            current_app.logger.error(f"ERROR: Unexpected issue during token verification process: {e}")
             traceback.print_exc() # Print full traceback for unexpected errors
             return jsonify({"error": "Token verification process failed unexpectedly", "details": str(e), "code": "VERIFICATION_PROCESS_ERROR"}), 401
         
@@ -247,51 +247,61 @@ class DatabaseManager:
     def _initialize(self, app): # Accept app instance
         self.flask_app = app # Store the app instance
         # Determine the absolute path for the SQLite databases
-        APP_DIR = os.path.dirname(os.path.abspath(__file__))
+        # Priority: Env Var -> Docker Vol -> Local Fallback
+        if os.getenv('DATA_DIR'):
+            base_dir = os.getenv('DATA_DIR')
+        elif os.path.exists('/app/data'):
+            base_dir = '/app/data'
+        else:
+            # Local fallback: backend/data
+            base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+        
+        os.makedirs(base_dir, exist_ok=True)
+        APP_DIR = base_dir
         
         # Initialize QuizGraph checkpointer
         QUIZ_DB_PATH = os.path.join(APP_DIR, "quiz_checkpoints.db")
         os.makedirs(os.path.dirname(QUIZ_DB_PATH), exist_ok=True)
         self.quiz_db_conn = sqlite3.connect(QUIZ_DB_PATH, check_same_thread=False)
         self.quiz_checkpointer = SqliteSaver(conn=self.quiz_db_conn, serde=JsonPlusSerializer())
-        print(f"DEBUG [APP - _initialize]: self.quiz_checkpointer type: {type(self.quiz_checkpointer)}, hasattr 'get_next_version': {hasattr(self.quiz_checkpointer, 'get_next_version')}")
+        self.flask_app.logger.debug(f"DEBUG [APP - _initialize]: self.quiz_checkpointer type: {type(self.quiz_checkpointer)}, hasattr 'get_next_version': {hasattr(self.quiz_checkpointer, 'get_next_version')}")
     
     # Initialize GeneralQueryGraph checkpointer
         GENERAL_QUERY_DB_PATH = os.path.join(APP_DIR, "general_query_checkpoints.db")
         os.makedirs(os.path.dirname(GENERAL_QUERY_DB_PATH), exist_ok=True)
         self.general_query_db_conn = sqlite3.connect(GENERAL_QUERY_DB_PATH, check_same_thread=False)
         self.general_query_checkpointer = SqliteSaver(conn=self.general_query_db_conn, serde=JsonPlusSerializer())
-        print(f"DEBUG [APP - _initialize]: self.general_query_checkpointer type: {type(self.general_query_checkpointer)}, hasattr 'get_next_version': {hasattr(self.general_query_checkpointer, 'get_next_version')}")
+        self.flask_app.logger.debug(f"DEBUG [APP - _initialize]: self.general_query_checkpointer type: {type(self.general_query_checkpointer)}, hasattr 'get_next_version': {hasattr(self.general_query_checkpointer, 'get_next_version')}")
     
     # Initialize SupervisorGraph checkpointer
         SUPERVISOR_DB_PATH = os.path.join(APP_DIR, "supervisor_checkpoints.db")
         os.makedirs(os.path.dirname(SUPERVISOR_DB_PATH), exist_ok=True)
         self.supervisor_db_conn = sqlite3.connect(SUPERVISOR_DB_PATH, check_same_thread=False)
         self.supervisor_checkpointer = SqliteSaver(conn=self.supervisor_db_conn, serde=JsonPlusSerializer())
-        print(f"DEBUG [APP - _initialize]: self.supervisor_checkpointer type: {type(self.supervisor_checkpointer)}, hasattr 'get_next_version': {hasattr(self.supervisor_checkpointer, 'get_next_version')}")
+        self.flask_app.logger.debug(f"DEBUG [APP - _initialize]: self.supervisor_checkpointer type: {type(self.supervisor_checkpointer)}, hasattr 'get_next_version': {hasattr(self.supervisor_checkpointer, 'get_next_version')}")
 
     # Initialize DocumentUnderstandingGraph checkpointer
         DU_DB_PATH = os.path.join(APP_DIR, "document_understanding_checkpoints.db")
         os.makedirs(os.path.dirname(DU_DB_PATH), exist_ok=True)
         self.du_db_conn = sqlite3.connect(DU_DB_PATH, check_same_thread=False)
         self.du_checkpointer = SqliteSaver(conn=self.du_db_conn, serde=JsonPlusSerializer())
-        print(f"DEBUG [APP - _initialize]: self.du_checkpointer type: {type(self.du_checkpointer)}, hasattr 'get_next_version': {hasattr(self.du_checkpointer, 'get_next_version')}")
+        self.flask_app.logger.debug(f"DEBUG [APP - _initialize]: self.du_checkpointer type: {type(self.du_checkpointer)}, hasattr 'get_next_version': {hasattr(self.du_checkpointer, 'get_next_version')}")
 
     # Initialize AnswerFormulationGraph checkpointer
         ANSWER_FORMULATION_DB_PATH = os.path.join(APP_DIR, "answer_formulation_sessions.db")
         os.makedirs(os.path.dirname(ANSWER_FORMULATION_DB_PATH), exist_ok=True)
         self.answer_formulation_db_conn = sqlite3.connect(ANSWER_FORMULATION_DB_PATH, check_same_thread=False)
         self.answer_formulation_checkpointer = SqliteSaver(conn=self.answer_formulation_db_conn, serde=JsonPlusSerializer())
-        print(f"DEBUG [APP - _initialize]: self.answer_formulation_checkpointer initialized for Answer Formulation")
+        self.flask_app.logger.debug(f"DEBUG [APP - _initialize]: self.answer_formulation_checkpointer initialized for Answer Formulation")
 
     # Create the compiled graphs
-        print("[DB Manager] Initializing Quiz Engine Graph (V2)...")
+        self.flask_app.logger.info("[DB Manager] Initializing Quiz Engine Graph (V2)...")
         self.compiled_quiz_graph = create_quiz_engine_graph(checkpointer=self.quiz_checkpointer)
-        print("[DB Manager] Quiz Engine Graph (V2) initialized.")
+        self.flask_app.logger.info("[DB Manager] Quiz Engine Graph (V2) initialized.")
 
-        print("[DB Manager] Initializing New Chat Graph (formerly General Query Graph)...")
+        self.flask_app.logger.info("[DB Manager] Initializing New Chat Graph (formerly General Query Graph)...")
         self.compiled_general_query_graph = create_new_chat_graph(checkpointer=self.general_query_checkpointer)
-        print("[DB Manager] New Chat Graph initialized.")
+        self.flask_app.logger.info("[DB Manager] New Chat Graph initialized.")
 
         # Retrieve AdvancedDocumentLayoutTool from app.config
         # This assumes app.config is accessible here or the tool is passed differently.
@@ -301,18 +311,18 @@ class DatabaseManager:
         # The new DUA is invoked directly from document_routes and does not need to be passed to the supervisor.
         doc_retrieval_service_instance = self.flask_app.config['SERVICES'].get('DocRetrievalService')
         if not doc_retrieval_service_instance:
-            print("CRITICAL ERROR: DocumentRetrievalService not found in app.config['SERVICES'].")
+            self.flask_app.logger.error("CRITICAL ERROR: DocumentRetrievalService not found in app.config['SERVICES'].")
 
         self.compiled_supervisor_graph = create_supervisor_graph(
             checkpointer=self.supervisor_checkpointer,
             doc_retrieval_service=doc_retrieval_service_instance
         )
 
-        print("[DB Manager] Initializing Answer Formulation Graph...")
+        self.flask_app.logger.info("[DB Manager] Initializing Answer Formulation Graph...")
         self.compiled_answer_formulation_graph = create_answer_formulation_graph(checkpointer=self.answer_formulation_checkpointer)
-        print("[DB Manager] Answer Formulation Graph initialized.")
+        self.flask_app.logger.info("[DB Manager] Answer Formulation Graph initialized.")
         
-        print("All graphs initialized with their respective checkpointers.")
+        self.flask_app.logger.info("All graphs initialized with their respective checkpointers.")
 
 # Initialize the database manager when the application starts
 try:
@@ -327,16 +337,16 @@ try:
     app.config['ANSWER_FORMULATION_GRAPH'] = db_manager.compiled_answer_formulation_graph
     app.config['ANSWER_FORMULATION_CHECKPOINTER'] = db_manager.answer_formulation_checkpointer
     
-    print("Successfully initialized all graphs and checkpointers.")
+    app.logger.info("Successfully initialized all graphs and checkpointers.")
 except ModuleNotFoundError as e:
     with open('error_trace.log', 'a') as f:
         f.write(f"Timestamp: {datetime.now()} - Error during DatabaseManager init or graph assignment\n")
         f.write(traceback.format_exc())
         f.write("\n------------------------------------\n")
-    print(f"CRITICAL: ModuleNotFoundError during DatabaseManager init. Full traceback written to error_trace.log. Error: {e}")
+    app.logger.critical(f"CRITICAL: ModuleNotFoundError during DatabaseManager init. Full traceback written to error_trace.log. Error: {e}")
     raise # Re-raise the exception
 except Exception as e:
-    print(f"Error initializing database connections (non-ModuleNotFoundError): {str(e)}")
+    app.logger.error(f"Error initializing database connections (non-ModuleNotFoundError): {str(e)}")
     raise
 
 # The active_quiz_sessions dictionary is replaced by the supervisor's state management.
@@ -348,10 +358,10 @@ except Exception as e:
 # --- WebSocket STT Endpoint ---
 @sock.route('/api/stt/stream')
 def stt_stream(ws):
-    print("WebSocket connection established for STT.")
+    current_app.logger.info("WebSocket connection established for STT.")
     stt_service = current_app.config.get('SERVICES', {}).get('STTService')
     if not stt_service or not stt_service.client:
-        print("STT Service not available, closing WebSocket.")
+        current_app.logger.error("STT Service not available, closing WebSocket.")
         ws.close(reason=1011, message='STT service is not configured on the server.')
         return
 
@@ -374,11 +384,11 @@ def stt_stream(ws):
                 if message is None:
                     continue
                 if isinstance(message, str):
-                    print(f"Received string message: {message}")
+                    current_app.logger.info(f"Received string message: {message}")
                     continue
                 yield speech.StreamingRecognizeRequest(audio_content=message)
             except ConnectionClosed:
-                print("Client connection closed in generator.")
+                current_app.logger.info("Client connection closed in generator.")
                 break
 
     try:
@@ -403,10 +413,10 @@ def stt_stream(ws):
             ws.send(json.dumps(response_data))
 
     except Exception as e:
-        print(f"Error during STT stream: {e}")
+        current_app.logger.error(f"Error during STT stream: {e}")
     finally:
         ws.close()
-        print("WebSocket connection closed.")
+        current_app.logger.info("WebSocket connection closed.")
 
 # --- Agent API Endpoint --- 
 @app.route('/api/v2/agent/chat', methods=['POST'])
@@ -443,7 +453,7 @@ def agent_chat_route():
                 audio_file = request.files['audio_file']
                 filename = secure_filename(audio_file.filename)
                 if filename:
-                    print(f"[API] Received audio file: {filename} from user {user_id}, processing mode: {stt_processing_mode}")
+                    current_app.logger.info(f"[API] Received audio file: {filename} from user {user_id}, processing mode: {stt_processing_mode}")
                     try:
                         audio_bytes = audio_file.read()
                         audio_data_base64 = base64.b64encode(audio_bytes).decode('utf-8')
@@ -454,9 +464,9 @@ def agent_chat_route():
                         elif ext == 'flac' or mimetype == 'audio/flac': audio_format = 'flac'
                         elif ext == 'webm' or mimetype == 'audio/webm' or mimetype == 'audio/webm;codecs=opus': audio_format = 'webm'
                         else:
-                            print(f"[API] Warning: Unknown audio format (ext: {ext}, mime: {mimetype}). Defaulting to mp3.")
+                            current_app.logger.warning(f"[API] Warning: Unknown audio format (ext: {ext}, mime: {mimetype}). Defaulting to mp3.")
                             audio_format = 'mp3'
-                        print(f"[API] Processed audio. Format: {audio_format}, Base64 len: {len(audio_data_base64)}")
+                        current_app.logger.info(f"[API] Processed audio. Format: {audio_format}, Base64 len: {len(audio_data_base64)}")
 
                         if stt_processing_mode == 'review':
                             # Transcribe and return immediately (existing logic)
@@ -488,30 +498,30 @@ def agent_chat_route():
                         elif stt_processing_mode == 'direct_send':
                             if client_provided_transcript:
                                 effective_query = client_provided_transcript
-                                print(f"[API] Using client-provided transcript for direct_send: '{effective_query[:50]}...' ")
+                                current_app.logger.info(f"[API] Using client-provided transcript for direct_send: '{effective_query[:50]}...' ")
                             elif audio_bytes: # Ensure audio_bytes is available for STT
                                 stt_service = app.config['SERVICES']['STTService']
-                                print(f"[API] Performing backend STT for direct_send (audio_format: {audio_format})")
+                                current_app.logger.info(f"[API] Performing backend STT for direct_send (audio_format: {audio_format})")
                                 success, stt_result = stt_service.transcribe_audio_bytes(audio_bytes=audio_bytes)
                                 if success and stt_result and isinstance(stt_result.get('transcript'), dict) and 'transcript' in stt_result['transcript']:
                                     effective_query = stt_result['transcript']['transcript']
-                                    print(f"[API] Backend STT for direct_send successful: '{effective_query[:50]}...' ")
+                                    current_app.logger.info(f"[API] Backend STT for direct_send successful: '{effective_query[:50]}...' ")
                                 elif success and stt_result and isinstance(stt_result.get('transcript'), str): # Handle if STT tool returns string directly
                                     effective_query = stt_result['transcript']
-                                    print(f"[API] Backend STT for direct_send successful (direct string): '{effective_query[:50]}...' ")
+                                    current_app.logger.info(f"[API] Backend STT for direct_send successful (direct string): '{effective_query[:50]}...' ")
                                 else:
                                     error_detail = "Backend STT failed for direct_send."
                                     if stt_result and stt_result.get('error'): error_detail = stt_result.get('error')
                                     elif not success : error_detail = "STT Tool indicated failure."
                                     else: error_detail = f"Unexpected STT result structure: {stt_result}"
-                                    print(f"[API] Error: {error_detail}")
+                                    current_app.logger.error(f"[API] Error: {error_detail}")
                                     return jsonify({"error": "Audio transcription failed for agent processing", "detail": error_detail, "thread_id": thread_id}), 400
                             else:
                                 # This case should ideally not be reached if 'audio_file' was present but audio_bytes is None
-                                print("[API] Warning: 'direct_send' mode with audio file, but no audio_bytes to transcribe and no client_transcript.")
+                                current_app.logger.warning("[API] Warning: 'direct_send' mode with audio file, but no audio_bytes to transcribe and no client_transcript.")
                                 effective_query = initial_form_query # Fallback, likely empty
                     except Exception as e:
-                        print(f"[API] Error processing audio file '{filename}': {e}")
+                        current_app.logger.error(f"[API] Error processing audio file '{filename}': {e}")
                         traceback.print_exc() # Add traceback for better debugging
                         return jsonify({"error": "Error processing audio file", "detail": str(e)}), 500
             
@@ -539,7 +549,7 @@ def agent_chat_route():
         if not audio_data_base64 and not effective_query:
              return jsonify({"error": "Query (text or transcribed audio) is required"}), 400
 
-        print(f"[API] User: {user_id}, Thread: {thread_id}, Effective Query: '{effective_query[:50]}...', Audio: {'Yes' if audio_data_base64 else 'No'}, DocID: {document_id}, Mode: {stt_processing_mode}")
+        current_app.logger.info(f"[API] User: {user_id}, Thread: {thread_id}, Effective Query: '{effective_query[:50]}...', Audio: {'Yes' if audio_data_base64 else 'No'}, DocID: {document_id}, Mode: {stt_processing_mode}")
 
         db_manager = DatabaseManager(current_app)
 
@@ -548,7 +558,7 @@ def agent_chat_route():
         if not thread_id:
             thread_id = f"thread_{user_id}_{str(uuid.uuid4())[:8]}"
             config["configurable"]["thread_id"] = thread_id
-            print(f"[API] Created new thread: {thread_id}")
+            current_app.logger.info(f"[API] Created new thread: {thread_id}")
             supervisor_input = SupervisorState(
                 user_id=user_id,
                 current_query=effective_query, # Use effective_query
@@ -565,26 +575,26 @@ def agent_chat_route():
                 current_audio_input_base64=audio_data_base64, # Still pass for potential downstream use
                 current_audio_format=audio_format
             )
-            print(f"[API] Invoking supervisor for new thread {thread_id} with initial state.")
+            current_app.logger.info(f"[API] Invoking supervisor for new thread {thread_id} with initial state.")
         else:
-            print(f"[API] Continuing existing thread: {thread_id}")
+            current_app.logger.info(f"[API] Continuing existing thread: {thread_id}")
             try:
                 current_state_checkpoint = compiled_supervisor_graph.get_state(config)
                 conversation_history = current_state_checkpoint.values.get("conversation_history", []) if current_state_checkpoint and hasattr(current_state_checkpoint, 'values') else []
                 # Deserialize messages after restoring from checkpoint
                 conversation_history = deserialize_messages(conversation_history)
-                print(f"[API] Retrieved conversation history with {len(conversation_history)} messages")
+                current_app.logger.info(f"[API] Retrieved conversation history with {len(conversation_history)} messages")
             except Exception as e:
-                print(f"[API] Could not retrieve current state: {e}. Starting with empty history.")
+                current_app.logger.error(f"[API] Could not retrieve current state: {e}. Starting with empty history.")
                 conversation_history = []
             
             retrieved_state_values = (current_state_checkpoint.values.copy() 
                                       if current_state_checkpoint and hasattr(current_state_checkpoint, 'values') and current_state_checkpoint.values 
                                       else {})
             if not retrieved_state_values:
-                 print("[API] Warning: current_state_checkpoint.values not available or empty. Initializing SupervisorState with defaults and request data.")
+                 current_app.logger.warning("[API] Warning: current_state_checkpoint.values not available or empty. Initializing SupervisorState with defaults and request data.")
             else:
-                print(f"[API] Retrieved state values from checkpoint: {list(retrieved_state_values.keys())}")
+                current_app.logger.info(f"[API] Retrieved state values from checkpoint: {list(retrieved_state_values.keys())}")
 
             supervisor_input = SupervisorState(
                 user_id=user_id,
@@ -606,7 +616,7 @@ def agent_chat_route():
                 document_understanding_output=retrieved_state_values.get("document_understanding_output"),
                 document_understanding_error=retrieved_state_values.get("document_understanding_error")
             )
-            print(f"[API] Invoking supervisor for existing thread {thread_id} with input.")
+            current_app.logger.info(f"[API] Invoking supervisor for existing thread {thread_id} with input.")
 
         logging.warning(f"SUPERVISOR_INPUT_STATE before invoke: {supervisor_input}")
         # Add diagnostic logging before safe invoke
@@ -618,8 +628,8 @@ def agent_chat_route():
         # Add diagnostic logging after serialization
         logging.debug("[DEBUG][Serialize] conversation_history types after serialization: %s",
                       [type(x).__name__ for x in supervisor_input.get("conversation_history", [])])
-        print(f"[API DEBUG] Raw result from supervisor: {result}")
-        print(f"[API DEBUG] final_agent_response in result: {result.get('final_agent_response')}")
+        current_app.logger.debug(f"[API DEBUG] Raw result from supervisor: {result}")
+        current_app.logger.debug(f"[API DEBUG] final_agent_response in result: {result.get('final_agent_response')}")
 
         # Check if a quiz is active and if its thread ID needs explicit checkpointing
         active_quiz_thread_id_from_result = result.get("active_quiz_thread_id")
@@ -630,8 +640,8 @@ def agent_chat_route():
             # The main 'invoke' call (above) checkpointed the state under the original 'thread_id' from the request.
             # We now need to ALSO checkpoint the current state ('result') under the new 'active_quiz_thread_id_from_result'
             # to ensure that the next request using this new quiz_thread_id can load its state.
-            print(f"[API] Quiz is active with a dedicated thread ID: {active_quiz_thread_id_from_result} (original request thread: {thread_id}).")
-            print(f"[API] Explicitly checkpointing current supervisor state under: {active_quiz_thread_id_from_result}")
+            current_app.logger.info(f"[API] Quiz is active with a dedicated thread ID: {active_quiz_thread_id_from_result} (original request thread: {thread_id}).")
+            current_app.logger.info(f"[API] Explicitly checkpointing current supervisor state under: {active_quiz_thread_id_from_result}")
             quiz_specific_config = {"configurable": {"thread_id": active_quiz_thread_id_from_result, "user_id": user_id}}
             try:
                 # 'result' is the full state dictionary from the supervisor graph's execution.
@@ -642,9 +652,9 @@ def agent_chat_route():
                         serialized_result["conversation_history"]
                     )
                 compiled_supervisor_graph.update_state(quiz_specific_config, serialized_result)
-                print(f"[API] State successfully checkpointed for new quiz thread: {active_quiz_thread_id_from_result}")
+                current_app.logger.info(f"[API] State successfully checkpointed for new quiz thread: {active_quiz_thread_id_from_result}")
             except Exception as e_checkpoint:
-                print(f"[API] CRITICAL ERROR: Failed to checkpoint state for new quiz thread {active_quiz_thread_id_from_result}: {e_checkpoint}")
+                current_app.logger.error(f"[API] CRITICAL ERROR: Failed to checkpoint state for new quiz thread {active_quiz_thread_id_from_result}: {e_checkpoint}")
                 # Depending on desired robustness, might want to inform user or affect response_data
 
         if not result:
@@ -674,11 +684,11 @@ def agent_chat_route():
         # Attempt to get TTSService from app config, falling back to direct instantiation if not found (for robustness)
         tts_service_instance = current_app.config.get('SERVICES', {}).get('TTSService')
         if not tts_service_instance:
-            print("[API] TTSService not found in app.config, attempting direct instantiation.")
+            current_app.logger.warning("[API] TTSService not found in app.config, attempting direct instantiation.")
             try:
                 tts_service_instance = TTSService() # Ensure TTSService is imported
             except Exception as e:
-                print(f"[API] Failed to directly instantiate TTSService: {e}")
+                current_app.logger.error(f"[API] Failed to directly instantiate TTSService: {e}")
                 tts_service_instance = None
 
         if tts_service_instance and tts_service_instance.is_functional() and response_text:
@@ -688,11 +698,11 @@ def agent_chat_route():
                     audio_bytes = tts_response["audio_content"]
                     timepoints = tts_response.get("timepoints") # Extract timepoints
                     audio_content_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-                    print(f"[API] TTS generated {len(audio_bytes)} bytes and {len(timepoints) if timepoints else 0} timepoints for chat response.")
+                    current_app.logger.info(f"[API] TTS generated {len(audio_bytes)} bytes and {len(timepoints) if timepoints else 0} timepoints for chat response.")
                 else:
-                    print("[API] TTS synthesis returned no audio bytes for chat response.")
+                    current_app.logger.warning("[API] TTS synthesis returned no audio bytes for chat response.")
             except Exception as tts_ex:
-                print(f"[API] Error during TTS synthesis for chat response: {tts_ex}")
+                current_app.logger.error(f"[API] Error during TTS synthesis for chat response: {tts_ex}")
 
         response_data = {
             "response": response_text, # General response text
@@ -709,17 +719,17 @@ def agent_chat_route():
         }
         if result.get("supervisor_error_message"):
             response_data["error_detail"] = result["supervisor_error_message"]
-            print(f"[API] Supervisor error for user {user_id}, thread {thread_id}: {result['supervisor_error_message']}")
+            current_app.logger.error(f"[API] Supervisor error for user {user_id}, thread {thread_id}: {result['supervisor_error_message']}")
 
-        print(f"[API] Chat request for user {user_id}, thread {thread_id} completed. Quiz active: {response_data['quiz_active']}")
+        current_app.logger.info(f"[API] Chat request for user {user_id}, thread {thread_id} completed. Quiz active: {response_data['quiz_active']}")
         return jsonify(response_data), 200
 
     except Exception as e:
         error_id = str(uuid.uuid4())
         error_msg_detail = f"Error processing chat request (ID: {error_id}): {str(e)}"
-        print(f"[API] --- {error_msg_detail} ---")
+        current_app.logger.error(f"[API] --- {error_msg_detail} ---")
         traceback.print_exc()
-        print("[API] " + "-" * 50)
+        current_app.logger.info("[API] " + "-" * 50)
         
         # Ensure thread_id is available for the error response if it was defined
         current_thread_id = thread_id if 'thread_id' in locals() and thread_id else None
@@ -731,6 +741,72 @@ def agent_chat_route():
             "details": str(e), # Keep it concise for the client
             "thread_id": current_thread_id
         }), 500
+
+@app.route('/api/v2/agent/history', methods=['GET'])
+@require_auth
+def get_chat_history_route():
+    """
+    Retrieve conversation history for a specific thread.
+    """
+    try:
+        user_id = g.user_id
+        thread_id = request.args.get('thread_id')
+        
+        if not thread_id:
+            return jsonify({"error": "thread_id is required"}), 400
+
+        current_app.logger.info(f"[API] Fetching history for thread: {thread_id}, user: {user_id}")
+
+        config = {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+        
+        # Access the compiled graph (assuming available globally like in agent_chat_route)
+        # Note: compiled_supervisor_graph is defined at module level in app.py
+        
+        try:
+            current_state_checkpoint = compiled_supervisor_graph.get_state(config)
+        except Exception as e:
+             current_app.logger.warning(f"[API] Could not retrieve state for history: {e}")
+             return jsonify({"conversation_history": []}), 200
+
+        if not current_state_checkpoint or not current_state_checkpoint.values:
+             current_app.logger.info(f"[API] No state found for thread {thread_id}")
+             return jsonify({"conversation_history": []}), 200
+
+        conversation_history = current_state_checkpoint.values.get("conversation_history", [])
+        
+        # Deserialize messages to ensure consistent object types
+        try:
+            conversation_history = deserialize_messages(conversation_history)
+        except Exception as e:
+            current_app.logger.error(f"[API] Error deserializing history: {e}")
+            # Fallback: return raw if deserialization fails (though unlikely to match format)
+            return jsonify({"conversation_history": [], "error": "Deserialization failed"}), 500
+
+        # Serialize for response (matching agent_chat_route logic)
+        serializable_history = []
+        for msg in conversation_history:
+            if isinstance(msg, HumanMessage):
+                serializable_history.append({"type": "human", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                serializable_history.append({"type": "ai", "content": msg.content})
+            elif isinstance(msg, dict):
+                 # Handle dicts if they slipped through deserialization or are custom
+                if msg.get("type") == "human":
+                    serializable_history.append({"type": "human", "content": msg.get("data", {}).get("content", "")})
+                elif msg.get("type") == "ai":
+                    serializable_history.append({"type": "ai", "content": msg.get("data", {}).get("content", "")})
+                else:
+                     serializable_history.append({"type": "system", "content": str(msg.get("data", {}).get("content", ""))})
+            else:
+                serializable_history.append({"type": "system", "content": str(msg.content)})
+
+        current_app.logger.info(f"[API] Returned {len(serializable_history)} messages for thread {thread_id}")
+        return jsonify({"conversation_history": serializable_history}), 200
+
+    except Exception as e:
+        current_app.logger.error(f"[API] Error in get_chat_history_route: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Basic Routes (Health Check, etc.) --- 
@@ -835,7 +911,7 @@ def test_firestore_connection():
         results['status'] = 'error'
         results['connection_status'] = 'Failed'
         results['error'] = str(e)
-        print(f"Firestore connection test failed: {e}")
+        current_app.logger.error(f"Firestore connection test failed: {e}")
         return jsonify(results), 500
 
     return jsonify(results)
@@ -852,6 +928,6 @@ if __name__ == '__main__':
             f.write(f"Timestamp: {datetime.now()}\n")
             f.write(traceback.format_exc())
             f.write("\n------------------------------------\n")
-        print(f"CRITICAL: ModuleNotFoundError occurred. Full traceback written to error_trace.log. Error: {e}")
+        app.logger.critical(f"CRITICAL: ModuleNotFoundError occurred. Full traceback written to error_trace.log. Error: {e}")
         # Optionally, re-raise the exception if you want the program to still exit with an error code
         # raise
