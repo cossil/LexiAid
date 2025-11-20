@@ -7,7 +7,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { FileQuestion, Volume2, VolumeX, Loader2 } from 'lucide-react';
-import { useOnDemandTTSPlayer } from '../../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface QuestionInputProps {
   value: string;
@@ -21,7 +22,14 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
   const remainingChars = maxLength - value.length;
   
   // TTS hook for reading the question aloud
-  const { playText, stopAudio, status } = useOnDemandTTSPlayer();
+  const {
+    playAudio,
+    stopAudio,
+    status,
+    activeTimepoint,
+    wordTimepoints,
+    seekAndPlay,
+  } = useTTSPlayer(null);
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -36,10 +44,14 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
   
   // TTS click handler
   const handlePlayQuestion = () => {
+    if (!value.trim()) {
+      return;
+    }
+
     if (status === 'playing' || status === 'loading') {
       stopAudio();
-    } else if (value.trim()) {
-      playText(value);
+    } else {
+      playAudio({ text: value });
     }
   };
 
@@ -78,23 +90,37 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
         Example: "Explain the causes of the American Revolution"
       </div>
 
-      {/* Textarea */}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        maxLength={maxLength}
-        placeholder="Type or paste your assignment question here..."
-        aria-label="Enter your assignment question"
-        className="w-full min-h-[100px] px-4 py-3 text-lg text-gray-900 bg-white border-2 border-gray-300 rounded-md 
-                   focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none
-                   placeholder:text-gray-400 placeholder:italic
-                   disabled:bg-gray-100 disabled:cursor-not-allowed
-                   resize-none overflow-hidden
-                   transition-colors duration-200"
-        style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
-      />
+      {status === 'playing' ? (
+        <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-md">
+          <HighlightedTextBlock
+            text={value}
+            wordTimepoints={wordTimepoints}
+            activeTimepoint={activeTimepoint}
+            onWordClick={(time) => seekAndPlay(time)}
+            className="text-lg"
+          />
+          <p className="text-xs text-blue-700 mt-2 font-medium">
+            Listening mode enabled — stop playback to edit your question.
+          </p>
+        </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          maxLength={maxLength}
+          placeholder="Type or paste your assignment question here..."
+          aria-label="Enter your assignment question"
+          className="w-full min-h-[100px] px-4 py-3 text-lg text-gray-900 bg-white border-2 border-gray-300 rounded-md 
+                     focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none
+                     placeholder:text-gray-400 placeholder:italic
+                     disabled:bg-gray-100 disabled:cursor-not-allowed
+                     resize-none overflow-hidden
+                     transition-colors duration-200"
+          style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
+        />
+      )}
 
       {/* Character counter and tip */}
       <div className="mt-3 flex items-start justify-between gap-4">

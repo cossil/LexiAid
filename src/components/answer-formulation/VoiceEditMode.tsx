@@ -8,7 +8,8 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, Check, Undo, ChevronDown, ChevronUp, Square, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import useRealtimeStt from '../../hooks/useRealtimeStt';
-import { useOnDemandTTSPlayer } from '../../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface VoiceEditModeProps {
   refinedAnswer: string;
@@ -40,17 +41,28 @@ const VoiceEditMode: React.FC<VoiceEditModeProps> = ({
   const { startDictation, stopDictation, transcript, status } = useRealtimeStt();
   
   // TTS hook for reading the refined answer aloud
-  const { playText, stopAudio, status: ttsStatus } = useOnDemandTTSPlayer();
+  const {
+    playAudio,
+    stopAudio,
+    status: ttsStatus,
+    activeTimepoint,
+    wordTimepoints,
+    seekAndPlay,
+  } = useTTSPlayer(null);
   
   const isRecording = status === 'dictating';
   const editCommandTranscript = transcript.final + transcript.interim;
   
   // TTS click handler
   const handlePlayRefinedAnswer = () => {
+    if (!refinedAnswer.trim()) {
+      return;
+    }
+
     if (ttsStatus === 'playing' || ttsStatus === 'loading') {
       stopAudio();
-    } else if (refinedAnswer.trim()) {
-      playText(refinedAnswer);
+    } else {
+      playAudio({ text: refinedAnswer });
     }
   };
 
@@ -152,9 +164,19 @@ const VoiceEditMode: React.FC<VoiceEditModeProps> = ({
         </div>
         
         <div className="p-4 bg-white rounded-md border-2 border-gray-300 min-h-[150px] max-h-[300px] overflow-y-auto">
-          <p className="text-lg text-gray-900 whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-            {renderAnswerWithHighlight()}
-          </p>
+          {ttsStatus === 'playing' ? (
+            <HighlightedTextBlock
+              text={refinedAnswer}
+              wordTimepoints={wordTimepoints}
+              activeTimepoint={activeTimepoint}
+              onWordClick={(time) => seekAndPlay(time)}
+              className="text-lg"
+            />
+          ) : (
+            <p className="text-lg text-gray-900 whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
+              {renderAnswerWithHighlight()}
+            </p>
+          )}
         </div>
         {highlightedText && (
           <p className="text-xs text-yellow-700 mt-1 italic">

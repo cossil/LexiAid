@@ -5,9 +5,10 @@
  * Allows direct text editing and voice insertion at cursor position.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Edit3, Mic, Check, Undo, Redo, Volume2, VolumeX, Loader2 } from 'lucide-react';
-import { useOnDemandTTSPlayer } from '../../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface ManualEditModeProps {
   initialAnswer: string;
@@ -31,15 +32,30 @@ const ManualEditMode: React.FC<ManualEditModeProps> = ({
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // TTS hook for reading the answer aloud
-  const { playText, stopAudio, status: ttsStatus } = useOnDemandTTSPlayer();
+  const {
+    playAudio,
+    stopAudio,
+    status: ttsStatus,
+    activeTimepoint,
+    wordTimepoints,
+    seekAndPlay,
+  } = useTTSPlayer(null);
+
+  const currentEditableText = useMemo(() => {
+    return editableRef.current?.textContent || history[historyIndex] || initialAnswer;
+  }, [history, historyIndex, initialAnswer]);
   
   // TTS click handler
   const handlePlayAnswer = () => {
     const currentText = editableRef.current?.textContent || '';
+    if (!currentText.trim()) {
+      return;
+    }
+
     if (ttsStatus === 'playing' || ttsStatus === 'loading') {
       stopAudio();
-    } else if (currentText.trim()) {
-      playText(currentText);
+    } else {
+      playAudio({ text: currentText });
     }
   };
 
@@ -275,17 +291,30 @@ const ManualEditMode: React.FC<ManualEditModeProps> = ({
             </button>
           </div>
         </div>
-        <div
-          ref={editableRef}
-          contentEditable
-          onInput={handleInput}
-          onBlur={saveCursorPosition}
-          suppressContentEditableWarning
-          className="p-4 bg-white rounded-md border-2 border-indigo-300 min-h-[200px] max-h-[400px] overflow-y-auto
-                   focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none
-                   text-lg text-gray-900 whitespace-pre-wrap cursor-text"
-          style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
-        />
+        {ttsStatus === 'playing' ? (
+          <div className="p-4 bg-indigo-50 rounded-md border-2 border-indigo-300 min-h-[200px] max-h-[400px] overflow-y-auto">
+            <HighlightedTextBlock
+              text={currentEditableText}
+              wordTimepoints={wordTimepoints}
+              activeTimepoint={activeTimepoint}
+              onWordClick={(time) => seekAndPlay(time)}
+              className="text-lg"
+            />
+            <p className="text-xs text-indigo-600 mt-2 font-medium">Listening mode enabled — stop playback to resume editing.</p>
+          </div>
+        ) : (
+          <div
+            ref={editableRef}
+            contentEditable
+            onInput={handleInput}
+            onBlur={saveCursorPosition}
+            suppressContentEditableWarning
+            className="p-4 bg-white rounded-md border-2 border-indigo-300 min-h-[200px] max-h-[400px] overflow-y-auto
+                     focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none
+                     text-lg text-gray-900 whitespace-pre-wrap cursor-text"
+            style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
+          />
+        )}
         <p className="text-xs text-gray-500 mt-1">
           Click anywhere in the text to place your cursor
         </p>

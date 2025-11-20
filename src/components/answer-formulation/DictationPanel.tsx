@@ -7,7 +7,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Mic, Square, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react';
-import { useOnDemandTTSPlayer } from '../../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface DictationPanelProps {
   transcript: string;
@@ -36,7 +37,14 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
   const wordCount = transcript.split(/\s+/).filter(word => word.length > 0).length;
   
   // TTS hook for reading the transcript aloud
-  const { playText, stopAudio, status: ttsStatus } = useOnDemandTTSPlayer();
+  const {
+    playAudio,
+    stopAudio,
+    status: ttsStatus,
+    activeTimepoint,
+    wordTimepoints,
+    seekAndPlay,
+  } = useTTSPlayer(null);
 
   // Auto-scroll to bottom when transcript updates
   useEffect(() => {
@@ -47,10 +55,14 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
   
   // TTS click handler
   const handlePlayTranscript = () => {
+    if (!transcript.trim()) {
+      return;
+    }
+
     if (ttsStatus === 'playing' || ttsStatus === 'loading') {
       stopAudio();
-    } else if (transcript.trim()) {
-      playText(transcript);
+    } else {
+      playAudio({ text: transcript });
     }
   };
 
@@ -145,9 +157,13 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
                 aria-label="Transcript"
               >
                 {transcript && (
-                  <p className="text-lg text-gray-900 whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-                    {transcript}
-                  </p>
+                  <HighlightedTextBlock
+                    text={transcript}
+                    wordTimepoints={wordTimepoints}
+                    activeTimepoint={activeTimepoint}
+                    onWordClick={(time) => seekAndPlay(time)}
+                    className="text-lg"
+                  />
                 )}
                 {interimTranscript && (
                   <p className="text-base text-gray-500 italic whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>

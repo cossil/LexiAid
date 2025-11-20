@@ -7,7 +7,8 @@
 
 import React from 'react';
 import { Sparkles, Volume2, VolumeX, Loader2, Check, Mic, Edit3, RotateCcw } from 'lucide-react';
-import { useOnDemandTTSPlayer } from '../../hooks/useOnDemandTTSPlayer';
+import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface RefinementPanelProps {
   originalTranscript: string;
@@ -36,16 +37,22 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
   
   // Separate TTS players for original transcript and refined answer
   const { 
-    playText: playOriginal, 
+    playAudio: playOriginal, 
     stopAudio: stopOriginal, 
-    status: originalStatus 
-  } = useOnDemandTTSPlayer();
+    status: originalStatus,
+    activeTimepoint: originalActiveTimepoint,
+    wordTimepoints: originalWordTimepoints,
+    seekAndPlay: seekOriginal,
+  } = useTTSPlayer(null);
 
   const { 
-    playText: playRefined, 
+    playAudio: playRefined, 
     stopAudio: stopRefined, 
-    status: refinedStatus 
-  } = useOnDemandTTSPlayer();
+    status: refinedStatus,
+    activeTimepoint: refinedActiveTimepoint,
+    wordTimepoints: refinedWordTimepoints,
+    seekAndPlay: seekRefined,
+  } = useTTSPlayer(null);
   
   // TTS click handlers
   const handlePlayOriginal = () => {
@@ -58,7 +65,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
     if (originalStatus === 'playing' || originalStatus === 'loading') {
       stopOriginal();
     } else if (originalTranscript.trim()) {
-      playOriginal(originalTranscript);
+      playOriginal({ text: originalTranscript });
     }
   };
 
@@ -72,7 +79,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
     if (refinedStatus === 'playing' || refinedStatus === 'loading') {
       stopRefined();
     } else if (refinedAnswer?.trim()) {
-      playRefined(refinedAnswer);
+      playRefined({ text: refinedAnswer });
     }
   };
 
@@ -116,9 +123,13 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
             )}
           </div>
           <div className="flex-1 p-4 bg-gray-50 rounded-md border border-gray-300 min-h-[200px] max-h-[400px] overflow-y-auto">
-            <p className="text-base text-gray-700 whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-              {originalTranscript}
-            </p>
+            <HighlightedTextBlock
+              text={originalTranscript}
+              wordTimepoints={originalWordTimepoints}
+              activeTimepoint={originalActiveTimepoint}
+              onWordClick={(time) => seekOriginal(time)}
+              className="text-base"
+            />
           </div>
         </div>
 
@@ -162,9 +173,13 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                 <p className="text-gray-600 font-medium">Applying your edit...</p>
               </div>
             ) : refinedAnswer ? (
-              <p className="text-lg text-gray-900 whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-                {refinedAnswer}
-              </p>
+              <HighlightedTextBlock
+                text={refinedAnswer}
+                wordTimepoints={refinedWordTimepoints}
+                activeTimepoint={refinedActiveTimepoint}
+                onWordClick={(time) => seekRefined(time)}
+                className="text-lg"
+              />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-400 italic text-center">
