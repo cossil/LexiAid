@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Book, 
-  BookOpen, 
-  Moon, 
-  Sun, 
-  Upload, 
-  MessageSquare, 
-  FileText, 
-  Award, 
-  Settings, 
-  LogOut, 
-  Folder, 
-  Menu, 
-  X, 
-  Headphones, 
+import {
+  Book,
+  BookOpen,
+  Moon,
+  Sun,
+  Upload,
+  MessageSquare,
+  FileText,
+  Settings,
+  LogOut,
+  Folder,
+  Menu,
+  X,
+  Headphones,
   User,
   Layers, // Added for Quiz icon
-  PenTool // Added for Answer Formulation icon
+  PenTool, // Added for Answer Formulation icon
+  LifeBuoy,
+  Megaphone,
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -90,7 +91,9 @@ const DashboardLayout: React.FC = () => {
 
     // Proceed with navigation.
     if (activeDocumentId) {
-      navigate(`/dashboard/chat?document=${activeDocumentId}`);
+      navigate(`/dashboard/chat?document=${activeDocumentId}`, {
+        state: { chatResetToken: `${Date.now()}` }
+      });
     } else {
       toast.error('Please select a document first.');
       navigate('/dashboard/documents');
@@ -110,13 +113,12 @@ const DashboardLayout: React.FC = () => {
   const navLinks: NavLinkEntry[] = [
     { to: '/dashboard', text: 'Dashboard', icon: <FileText className="w-5 h-5" /> },
     { to: '/dashboard/documents', text: 'My Documents', icon: <Folder className="w-5 h-5" /> },
-    { to: '/dashboard/study', text: 'Study Mode', icon: <Book className="w-5 h-5" /> },
     { text: 'Read document', icon: <BookOpen className="w-5 h-5" />, onClick: handleReadNavigation },
     { text: 'Chat with the document', icon: <MessageSquare className="w-5 h-5" />, onClick: handleChatNavigation },
     { text: 'Quiz', icon: <Layers className="w-5 h-5" />, onClick: handleQuizNavigation },
     { to: '/dashboard/answer-formulation', text: 'Answer Formulation', icon: <PenTool className="w-5 h-5" /> },
     { to: '/dashboard/upload', text: 'Upload Document', icon: <Upload className="w-5 h-5" /> },
-    { to: '/dashboard/progress', text: 'My Progress', icon: <Award className="w-5 h-5" /> },
+    { to: '/dashboard/feedback', text: 'Feedback', icon: <Megaphone className="w-5 h-5" /> },
     { to: '/dashboard/settings', text: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
   
@@ -185,7 +187,6 @@ const DashboardLayout: React.FC = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium">{currentUser?.displayName || currentUser?.email}</p>
-                <p className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Student</p>
               </div>
             </div>
             
@@ -227,6 +228,17 @@ const DashboardLayout: React.FC = () => {
                 }
               })}
               
+              <a
+                href="mailto:cossil@lexiaid.com?subject=LexiAid%20Support"
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                  highContrast ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-200 hover:bg-gray-700'
+                } transition-colors duration-200`}
+                onMouseEnter={() => handleNavLinkHover('Help and Support')}
+              >
+                <LifeBuoy className="w-5 h-5" />
+                <span className="ml-3">Help & Support</span>
+              </a>
+
               <button
                 onClick={handleLogout}
                 className={`w-full group flex items-center px-4 py-3 text-base font-medium rounded-md ${
@@ -268,7 +280,6 @@ const DashboardLayout: React.FC = () => {
                     <p className="text-sm font-medium truncate max-w-[140px]">
                       {currentUser?.displayName || currentUser?.email}
                     </p>
-                    <p className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Student</p>
                   </div>
                 </div>
               </div>
@@ -311,6 +322,17 @@ const DashboardLayout: React.FC = () => {
                     );
                   }
                 })}
+
+                <a
+                  href="mailto:cossil@lexiaid.com?subject=LexiAid%20Support"
+                  className={`group flex items-center px-4 py-3 text-base font-medium rounded-md ${
+                    highContrast ? 'text-white hover:bg-gray-900' : 'text-gray-200 hover:bg-gray-700'
+                  } transition-colors duration-200`}
+                  onMouseEnter={() => handleNavLinkHover('Help and Support')}
+                >
+                  <LifeBuoy className="w-5 h-5" />
+                  <span className="ml-4">Help & Support</span>
+                </a>
               </nav>
               
               {/* Sidebar footer with logout and accessibility controls */}

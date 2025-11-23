@@ -412,6 +412,29 @@ class FirestoreService:
         except Exception as e:
             logger.error(f"Error deleting document {document_id} from Firestore: {e}")
             return None
+
+    # Feedback-related methods
+
+    def save_feedback(self, feedback_data: Dict[str, Any]) -> str:
+        """Persist a feedback report for later admin review."""
+        required_fields = ['user_id', 'email', 'type', 'description', 'browser_info']
+        missing_fields = [field for field in required_fields if not feedback_data.get(field)]
+        if missing_fields:
+            raise ValueError(f"Missing required feedback fields: {', '.join(missing_fields)}")
+
+        payload = {
+            'user_id': feedback_data['user_id'],
+            'email': feedback_data['email'],
+            'type': feedback_data['type'],
+            'description': feedback_data['description'],
+            'browser_info': feedback_data['browser_info'],
+            'status': feedback_data.get('status', 'new'),
+            'created_at': google_firestore.SERVER_TIMESTAMP,
+        }
+
+        doc_ref = self.db.collection('feedback_reports').document()
+        doc_ref.set(payload)
+        return doc_ref.id
     
     def get_user_documents(self, user_id: str, folder_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """

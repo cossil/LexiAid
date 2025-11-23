@@ -13,11 +13,15 @@ import DocumentsList from './pages/DocumentsList';
 import Settings from './pages/Settings';
 import ChatPage from './pages/ChatPage';
 import AnswerFormulationPage from './pages/AnswerFormulationPage';
+import DashboardFeedback from './pages/DashboardFeedback';
 import DashboardLayout from './layouts/DashboardLayout';
 import { useAuth } from './contexts/AuthContext';
 import { DocumentProvider } from './contexts/DocumentContext'; // Import DocumentProvider
 import QuizProvider from './contexts/QuizContext';
 import { Toaster } from 'react-hot-toast';
+import About from './pages/public/About';
+import Privacy from './pages/public/Privacy';
+import Terms from './pages/public/Terms';
 
 // Developer-only import - lazy loaded and excluded from production builds
 const DeprecationShowcase = import.meta.env.DEV 
@@ -120,6 +124,9 @@ const AppRoutes = () => {
       <Route path="/auth/signin" element={<SignIn />} />
       <Route path="/auth/signup" element={<SignUp />} />
       <Route path="/auth/reset-password" element={<ResetPassword />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       
       {/* Developer-only routes - only available in development mode */}
       {import.meta.env.DEV && DeprecationShowcase && (
@@ -158,6 +165,9 @@ const AppRoutes = () => {
         
         {/* Answer Formulation route */}
         <Route path="answer-formulation" element={<AnswerFormulationPage />} />
+
+        {/* Feedback route */}
+        <Route path="feedback" element={<DashboardFeedback />} />
         
         {/* Settings route */}
         <Route path="settings" element={<Settings />} />

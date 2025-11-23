@@ -29,11 +29,25 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   const manualStopRef = useRef<boolean>(false);
   const { startRecording, stopRecording, isRecording } = useAudioRecorder();
 
+  const resolveBackendOrigin = () => {
+    const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+    const rawBase = import.meta.env.VITE_BACKEND_API_URL || fallback;
+    try {
+      const base = new URL(rawBase);
+      return `${base.protocol}//${base.host}`;
+    } catch (error) {
+      console.error('Failed to parse backend URL, falling back to page origin:', error);
+      return fallback;
+    }
+  };
+
   const connectWebSocket = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
-      // The WebSocket URL should be derived from the backend URL, handling ws/wss protocols.
-      const backendApiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
-      const wsUrl = backendApiUrl.replace(/^http/, 'ws') + '/api/stt/stream';
+      // Derive WebSocket origin carefully so environments with "/api" suffixes still work.
+      const backendOrigin = resolveBackendOrigin();
+      const wsProtocol = backendOrigin.startsWith('https') ? 'wss' : backendOrigin.startsWith('http') ? 'ws' : undefined;
+      const normalizedOrigin = backendOrigin.replace(/^https?/, wsProtocol || 'ws');
+      const wsUrl = `${normalizedOrigin}/api/stt/stream`;
       console.log('Connecting to WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -83,9 +97,19 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
     try {
       await connectWebSocket();
       await startRecording({ onChunk: (chunk) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(chunk);
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          return;
         }
+
+        chunk.arrayBuffer()
+          .then((buffer) => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(buffer);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to stream audio chunk to STT socket:', err);
+          });
       }});
     } catch (err) {
       console.error('Failed to start dictation:', err);

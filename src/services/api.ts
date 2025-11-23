@@ -108,7 +108,7 @@ export const apiService = {
   },
 
   // Chat with AI Tutor
-  async chat(payload: { query: string; documentId?: string; threadId?: string }): Promise<{
+  async chat(payload: { query: string; documentId?: string; threadId?: string; mode?: 'general_chat' | 'quiz' }): Promise<{
     agent_response?: string;
     thread_id?: string;
     audio_content_base64?: string | null;
@@ -125,6 +125,7 @@ export const apiService = {
       query: payload.query,
       documentId: payload.documentId,
       thread_id: payload.threadId,
+      mode: payload.mode,
     });
     
     // Map the backend response to the expected frontend format
@@ -246,6 +247,19 @@ export const apiService = {
       query: '/cancel_quiz',
       thread_id: threadId,
     });
+  },
+
+  // Submit feedback report
+  async submitFeedback(data: { type: string; description: string; browserInfo: string }): Promise<{
+    status: string;
+    feedback_id: string;
+  }> {
+    const response = await api.post('/api/feedback', {
+      type: data.type,
+      description: data.description,
+      browser_info: data.browserInfo,
+    });
+    return response.data;
   },
   
   // Get user profile

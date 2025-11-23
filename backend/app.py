@@ -80,6 +80,43 @@ from langchain_core.runnables import RunnableConfig
 from backend.utils.message_utils import serialize_messages, deserialize_messages, serialize_deep, deserialize_deep
 from functools import wraps # Added for auth decorator
 
+# --- Authentication Decorator --- 
+def require_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Authorization header is missing or invalid", "code": "UNAUTHENTICATED"}), 401
+        
+        token = auth_header.split('Bearer ')[1]
+        auth_service = current_app.config.get('AUTH_SERVICE')
+        if not auth_service:
+            current_app.logger.error("ERROR: Authentication service not available in app config")
+            return jsonify({"error": "Authentication service not available", "code": "AUTH_SERVICE_UNAVAILABLE"}), 500
+
+        try:
+            success, token_data = auth_service.verify_id_token(token)
+            
+            if not success or not token_data:
+                current_app.logger.debug(f"DEBUG: AuthService.verify_id_token returned success={success}, token_data present={token_data is not None}")
+                return jsonify({"error": "Invalid or expired token", "details": "Token verification failed by auth service.", "code": "INVALID_TOKEN_AUTH_SERVICE"}), 401
+
+            user_id = token_data.get('uid')
+            
+            if not user_id:
+                current_app.logger.error(f"ERROR: User ID ('uid') not found in verified token data: {token_data}")
+                return jsonify({"error": "User ID not found in token claims", "code": "USER_ID_NOT_IN_TOKEN_CLAIMS"}), 401
+            
+            g.user_id = user_id
+            g.user_email = token_data.get('email')
+        except Exception as e:
+            current_app.logger.error(f"ERROR: Unexpected issue during token verification process: {e}")
+            traceback.print_exc()
+            return jsonify({"error": "Token verification process failed unexpectedly", "details": str(e), "code": "VERIFICATION_PROCESS_ERROR"}), 401
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Import Blueprints using absolute paths
 from backend.routes.document_routes import document_bp
 from backend.routes.tts_routes import tts_bp
@@ -87,6 +124,7 @@ from backend.routes.stt_routes import stt_bp
 from backend.routes.user_routes import user_bp
 from backend.routes.progress_routes import progress_bp
 from backend.routes.answer_formulation_routes import answer_formulation_bp
+from backend.routes.feedback_routes import feedback_bp
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -168,49 +206,7 @@ app.register_blueprint(stt_bp, url_prefix='/api/stt')
 app.register_blueprint(user_bp, url_prefix='/api/users')
 app.register_blueprint(progress_bp, url_prefix='/api/progress')
 app.register_blueprint(answer_formulation_bp, url_prefix='/api/v2/answer-formulation')
-
-# --- Authentication Decorator --- 
-def require_auth(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Authorization header is missing or invalid", "code": "UNAUTHENTICATED"}), 401
-        
-        token = auth_header.split('Bearer ')[1]
-        auth_service = current_app.config.get('AUTH_SERVICE')
-        if not auth_service:
-            current_app.logger.error("ERROR: Authentication service not available in app config")
-            return jsonify({"error": "Authentication service not available", "code": "AUTH_SERVICE_UNAVAILABLE"}), 500
-
-        try:
-            success, token_data = auth_service.verify_id_token(token)
-            
-            if not success or not token_data:
-                # AuthService.verify_id_token would have printed specific error (expired, invalid, etc.)
-                # The 'details' in the jsonify below will be whatever exception string is caught if any other exception occurs.
-                # Or we can make it more generic if AuthService handles all specific error messages itself.
-                current_app.logger.debug(f"DEBUG: AuthService.verify_id_token returned success={success}, token_data present={token_data is not None}")
-                return jsonify({"error": "Invalid or expired token", "details": "Token verification failed by auth service.", "code": "INVALID_TOKEN_AUTH_SERVICE"}), 401
-
-            # Firebase typically uses 'uid' for user ID in the decoded token claims.
-            # The token_data here is the user_data dictionary returned by AuthService.
-            user_id = token_data.get('uid')
-            
-            if not user_id:
-                current_app.logger.error(f"ERROR: User ID ('uid') not found in verified token data: {token_data}")
-                return jsonify({"error": "User ID not found in token claims", "code": "USER_ID_NOT_IN_TOKEN_CLAIMS"}), 401
-            
-            g.user_id = user_id # Store user_id in Flask's g object for the request context
-        except Exception as e:
-            # This catch block is more for unexpected errors during the call or unpacking,
-            # as AuthService is expected to catch specific Firebase auth exceptions.
-            current_app.logger.error(f"ERROR: Unexpected issue during token verification process: {e}")
-            traceback.print_exc() # Print full traceback for unexpected errors
-            return jsonify({"error": "Token verification process failed unexpectedly", "details": str(e), "code": "VERIFICATION_PROCESS_ERROR"}), 401
-        
-        return f(*args, **kwargs)
-    return decorated_function
+app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
 
 # Safe Supervisor Invoke Wrapper
 def safe_supervisor_invoke(compiled_supervisor_graph, supervisor_input, config=None):
@@ -441,6 +437,7 @@ def agent_chat_route():
         audio_format: Optional[str] = None
         stt_processing_mode = "direct_send"  # Default mode
         client_provided_transcript: Optional[str] = None
+        interaction_mode: Optional[str] = None
 
         if request.content_type.startswith('multipart/form-data'):
             initial_form_query = request.form.get('query', '') # Might be empty
@@ -448,6 +445,7 @@ def agent_chat_route():
             document_id = request.form.get('document_id')
             stt_processing_mode = request.form.get('stt_processing_mode', 'direct_send')
             client_provided_transcript = request.form.get('transcript')
+            interaction_mode = request.form.get('mode')
             
             if 'audio_file' in request.files:
                 audio_file = request.files['audio_file']
@@ -541,6 +539,7 @@ def agent_chat_route():
             document_id = data.get('documentId')
             stt_processing_mode = data.get('stt_processing_mode', 'direct_send') # Can be passed, though less common for JSON
             client_provided_transcript = data.get('transcript') # Also less common for JSON, but possible
+            interaction_mode = data.get('mode')
             if client_provided_transcript and not effective_query: # If query is empty but transcript is there
                 effective_query = client_provided_transcript
         else:
@@ -562,6 +561,7 @@ def agent_chat_route():
             supervisor_input = SupervisorState(
                 user_id=user_id,
                 current_query=effective_query, # Use effective_query
+                interaction_mode=interaction_mode,
                 conversation_history=[],
                 active_quiz_thread_id=None,
                 document_id_for_action=document_id,
@@ -596,9 +596,12 @@ def agent_chat_route():
             else:
                 current_app.logger.info(f"[API] Retrieved state values from checkpoint: {list(retrieved_state_values.keys())}")
 
+            resolved_interaction_mode = interaction_mode if interaction_mode is not None else retrieved_state_values.get("interaction_mode")
+
             supervisor_input = SupervisorState(
                 user_id=user_id,
                 current_query=effective_query, # Use effective_query
+                interaction_mode=resolved_interaction_mode,
                 current_audio_input_base64=audio_data_base64,
                 current_audio_format=audio_format,
                 document_id_for_action=document_id,
