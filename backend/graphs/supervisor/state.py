@@ -6,6 +6,7 @@ class SupervisorState(TypedDict):
     """State for the Supervisor Graph."""
     user_id: str
     current_query: str             # The raw text of the user's current incoming query
+    interaction_mode: NotRequired[Optional[Literal['general_chat', 'quiz']]]
     
     # Master conversation history, managed by the supervisor
     conversation_history: List[BaseMessage] 

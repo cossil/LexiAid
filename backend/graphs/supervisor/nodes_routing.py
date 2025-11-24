@@ -115,6 +115,16 @@ def receive_user_input_node(state: SupervisorState) -> dict[str, Any]:
             updates["document_id_for_action"] = extracted_doc_id
             print(f"[Supervisor] Extracted document_id '{extracted_doc_id}' from query.")
 
+    interaction_mode = state.get("interaction_mode")
+
+    # If the frontend explicitly requests general chat, force reset quiz state
+    if interaction_mode == "general_chat":
+        if updates.get("is_quiz_v2_active"):
+            print("[Supervisor] Interaction mode 'general_chat' detected. Forcing quiz state reset before routing.")
+        updates["is_quiz_v2_active"] = False
+        updates["active_quiz_v2_thread_id"] = None
+        updates["interaction_mode"] = interaction_mode
+
     # Preliminary routing decision
     if updates.get("is_quiz_v2_active"):
         print("[Supervisor] Quiz v2 active, routing to quiz_engine_graph for answer/cancel.")
@@ -155,12 +165,24 @@ def routing_decision_node(state: SupervisorState, doc_retrieval_service: Optiona
     document_id_for_action = state.get("document_id_for_action")
     user_id = state.get("user_id")
     
+    interaction_mode = state.get("interaction_mode")
     is_quiz_v2_active_current = state.get("is_quiz_v2_active", False)
     preliminary_next_graph = state.get("next_graph_to_invoke")
 
     updates: dict[str, Any] = {} # Start with an empty dict for updates
 
     print(f"[Supervisor] Routing with query: '{current_query[:100]}...', doc_id: {document_id_for_action}, is_quiz_v2_active: {is_quiz_v2_active_current}, prelim_route: {preliminary_next_graph}")
+
+    # Honor forced general chat mode by killing quiz state immediately
+    if interaction_mode == "general_chat" and is_quiz_v2_active_current:
+        print("[Supervisor] Interaction mode override: general_chat. Terminating active quiz state before routing.")
+        updates["is_quiz_v2_active"] = False
+        updates["active_quiz_v2_thread_id"] = None
+        updates["quiz_v2_output"] = {"status": "quiz_cancelled", "feedback_for_user": "Quiz ended because you switched back to chat."}
+        updates["final_agent_response"] = "Switched back to chat. How can I help you?"
+        updates["next_graph_to_invoke"] = "new_chat_graph"
+        updates["interaction_mode"] = interaction_mode
+        return updates
 
     # 1. Handle active Quiz V2 session (cancellation or answer)
     if is_quiz_v2_active_current:

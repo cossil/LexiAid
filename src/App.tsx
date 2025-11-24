@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import LandingPage from './pages/LandingPage';
@@ -15,6 +15,7 @@ import ChatPage from './pages/ChatPage';
 import AnswerFormulationPage from './pages/AnswerFormulationPage';
 import DashboardFeedback from './pages/DashboardFeedback';
 import DashboardLayout from './layouts/DashboardLayout';
+import PublicLayout from './layouts/PublicLayout';
 import { useAuth } from './contexts/AuthContext';
 import { DocumentProvider } from './contexts/DocumentContext'; // Import DocumentProvider
 import QuizProvider from './contexts/QuizContext';
@@ -121,9 +122,14 @@ const AppRoutes = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth/signin" element={<SignIn />} />
-      <Route path="/auth/signup" element={<SignUp />} />
-      <Route path="/auth/reset-password" element={<ResetPassword />} />
+      
+      {/* Auth routes wrapped in PublicLayout */}
+      <Route element={<PublicLayout><Outlet /></PublicLayout>}>
+        <Route path="/auth/signin" element={<SignIn />} />
+        <Route path="/auth/signup" element={<SignUp />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
+      </Route>
+
       <Route path="/about" element={<About />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />

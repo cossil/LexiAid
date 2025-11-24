@@ -26,6 +26,7 @@ const ChatPage: React.FC = () => {
   useAccessibility();
   const location = useLocation();
   const navigate = useNavigate();
+  const chatResetToken = (location.state as { chatResetToken?: string } | null)?.chatResetToken;
 
   const documentIdFromUrl = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -41,6 +42,20 @@ const ChatPage: React.FC = () => {
   const [document, setDocument] = useState<{ id: string; name: string } | null>(null);
   const [isQuiz, setIsQuiz] = useState<boolean>(false);
   const quizInitializationAttempted = useRef(false);
+  const lastNavigationSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const navigationSignature = `${location.key || 'initial'}:${chatResetToken ?? 'none'}`;
+    if (lastNavigationSignatureRef.current === navigationSignature) {
+      return; // Avoid duplicate resets when React StrictMode replays effects
+    }
+
+    lastNavigationSignatureRef.current = navigationSignature;
+
+    // Soft reset when navigating (even to the same path) so chat UI becomes primary again
+    setIsQuiz(false);
+    quizInitializationAttempted.current = false;
+  }, [location.key, chatResetToken]);
 
   useEffect(() => {
     if (threadId) {
@@ -110,7 +125,8 @@ const ChatPage: React.FC = () => {
       const response: ChatApiResponse = await apiService.chat({
         query: '/start_quiz',
         documentId: documentIdFromUrl,
-        threadId: undefined
+        threadId: undefined,
+        mode: 'quiz'
       });
 
       if (response.thread_id) {
@@ -167,10 +183,13 @@ const ChatPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const modeToSend: 'general_chat' | 'quiz' = isQuiz ? 'quiz' : 'general_chat';
+
       const response: ChatApiResponse = await apiService.chat({
         query: messageText,
         documentId: documentIdFromUrl || undefined,
-        threadId: threadId || undefined
+        threadId: threadId || undefined,
+        mode: modeToSend
       });
 
       if (response.thread_id && !threadId) {
@@ -203,6 +222,8 @@ const ChatPage: React.FC = () => {
 
       if (response.is_quiz) {
         setIsQuiz(true);
+      } else if (response.quiz_complete || response.quiz_cancelled) {
+        setIsQuiz(false);
       }
     } catch (error: any) {
       console.error('Error sending message:', error);

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Book, Moon, Headphones, ArrowRight, CheckCircle, FileText, MessageSquare } from 'lucide-react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { SpeakableText } from '../components/SpeakableText';
-import { SpeakableDocumentContent } from '../components/SpeakableDocumentContent';
+import Footer from '../components/shared/Footer';
 
 const LandingPage: React.FC = () => {
   const { speakText, uiTtsEnabled, toggleUiTts, toggleHighContrast, highContrast } = useAccessibility();
@@ -26,7 +26,7 @@ const LandingPage: React.FC = () => {
       <nav className="w-full py-4 px-6 flex items-center justify-between">
         <div className="flex items-center">
           <Book className={highContrast ? "text-white mr-2" : "text-blue-400 mr-2"} size={24} aria-hidden="true" />
-          <span className={highContrast ? "text-white font-medium text-xl" : "text-blue-400 font-medium text-xl"}>AI Tutor</span>
+          <span className={highContrast ? "text-white font-medium text-xl" : "text-blue-400 font-medium text-xl"}>LexiAid</span>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -82,9 +82,9 @@ const LandingPage: React.FC = () => {
       <div className="text-center py-20 px-6 max-w-3xl mx-auto">
         <h1 
           className={`${highContrast ? 'text-white' : 'text-white'} text-4xl sm:text-5xl font-bold mb-4 leading-tight`}
-          onMouseEnter={() => handleHover('AI Tutor for Students with Dyslexia')}
+          onMouseEnter={() => handleHover('LexiAid for Students with Dyslexia')}
         >
-          AI Tutor for Students with Dyslexia
+          LexiAid for Students with Dyslexia
         </h1>
         <p 
           className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} text-lg sm:text-xl leading-relaxed mb-8`}
@@ -159,7 +159,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6">
           {/* FIXED: Replaced direct onMouseEnter with SpeakableText component for precise hover detection */}
           <h2 className={`${highContrast ? 'text-white' : 'text-white'} text-3xl font-bold text-center mb-12`}>
-            <SpeakableText text="How AI Tutor Works" />
+            <SpeakableText text="How LexiAid Works" />
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -214,75 +214,6 @@ const LandingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Testimonials */}
-      <div className="w-full max-w-7xl mx-auto px-6 py-16">
-        <h2 
-          className={`${highContrast ? 'text-white' : 'text-white'} text-3xl font-bold text-center mb-12`}
-          onMouseEnter={() => handleHover('Student Success Stories')}
-        >
-          Student Success Stories
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Testimonial 1 */}
-          <div 
-            className={`${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} rounded-lg p-6`}
-            onMouseEnter={() => handleHover('AI Tutor helped me understand my science textbook better than ever before. The text customization options are perfect for my needs. - Jamie, 15')}
-          >
-            <div className="flex items-start mb-4">
-              <p className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} italic`}>
-                "AI Tutor helped me understand my science textbook better than ever before. The text customization options are perfect for my needs."
-              </p>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-10 h-10 rounded-full ${highContrast ? 'bg-white text-black' : 'bg-blue-600 text-white'} flex items-center justify-center font-bold`}>J</div>
-              <div className="ml-3">
-                <p className={`${highContrast ? 'text-white' : 'text-white'} font-medium`}>Jamie, 15</p>
-                <p className={`${highContrast ? 'text-gray-300' : 'text-gray-400'} text-sm`}>High School Student</p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Testimonial 2 */}
-          <div 
-            className={`${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} rounded-lg p-6`}
-            onMouseEnter={() => handleHover(`The AI tutor is patient and explains things in different ways until I understand. It's like having a personal teacher 24/7. - Michael, 19`)}
-          >
-            <div className="flex items-start mb-4">
-              <p className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} italic`}>
-                "The AI tutor is patient and explains things in different ways until I understand. It's like having a personal teacher 24/7."
-              </p>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-10 h-10 rounded-full ${highContrast ? 'bg-white text-black' : 'bg-blue-600 text-white'} flex items-center justify-center font-bold`}>M</div>
-              <div className="ml-3">
-                <p className={`${highContrast ? 'text-white' : 'text-white'} font-medium`}>Michael, 19</p>
-                <p className={`${highContrast ? 'text-gray-300' : 'text-gray-400'} text-sm`}>College Freshman</p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Testimonial 3 */}
-          <div 
-            className={`${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} rounded-lg p-6`}
-            onMouseEnter={() => handleHover(`As a parent, I've seen a remarkable improvement in my daughter's confidence with reading since using AI Tutor. - Sarah, Parent`)}
-          >
-            <div className="flex items-start mb-4">
-              <p className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} italic`}>
-                "As a parent, I've seen a remarkable improvement in my daughter's confidence with reading since using AI Tutor."
-              </p>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-10 h-10 rounded-full ${highContrast ? 'bg-white text-black' : 'bg-blue-600 text-white'} flex items-center justify-center font-bold`}>S</div>
-              <div className="ml-3">
-                <p className={`${highContrast ? 'text-white' : 'text-white'} font-medium`}>Sarah</p>
-                <p className={`${highContrast ? 'text-gray-300' : 'text-gray-400'} text-sm`}>Parent</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* CTA Section */}
       <div className={`${highContrast ? 'bg-black' : 'bg-blue-600/20'} py-16 px-6`}>
         <div className="max-w-4xl mx-auto text-center">
@@ -290,7 +221,7 @@ const LandingPage: React.FC = () => {
             Ready to transform your learning experience?
           </h2>
           <p className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} text-lg mb-8 max-w-2xl mx-auto`}>
-            Join thousands of students who are already benefiting from AI Tutor's personalized learning assistance.
+            Join thousands of students who are already benefiting from LexiAid's personalized learning assistance.
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
@@ -317,7 +248,7 @@ const LandingPage: React.FC = () => {
       {/* Benefits Section */}
       <div className="w-full max-w-7xl mx-auto px-6 py-16">
         <h2 className={`${highContrast ? 'text-white' : 'text-white'} text-3xl font-bold text-center mb-12`}>
-          Why Choose AI Tutor?
+          Why Choose LexiAid?
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -389,56 +320,7 @@ const LandingPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <footer className={`w-full py-12 px-6 ${highContrast ? 'bg-gray-900 border-t border-white' : 'bg-gray-900'}`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-            <div className="flex items-center mb-4 md:mb-0">
-              <Book className={highContrast ? "text-white mr-2" : "text-blue-400 mr-2"} size={24} aria-hidden="true" />
-              <span className={highContrast ? "text-white font-medium text-xl" : "text-blue-400 font-medium text-xl"}>AI Tutor</span>
-            </div>
-            
-            <div className="flex space-x-6">
-              <Link 
-                to="/about" 
-                className={`${highContrast ? 'text-white hover:text-gray-300' : 'text-gray-300 hover:text-white'} transition-colors duration-200`}
-                onMouseEnter={() => handleHover('About')}
-              >
-                About
-              </Link>
-              <Link 
-                to="/privacy" 
-                className={`${highContrast ? 'text-white hover:text-gray-300' : 'text-gray-300 hover:text-white'} transition-colors duration-200`}
-                onMouseEnter={() => handleHover('Privacy')}
-              >
-                Privacy
-              </Link>
-              <Link 
-                to="/terms" 
-                className={`${highContrast ? 'text-white hover:text-gray-300' : 'text-gray-300 hover:text-white'} transition-colors duration-200`}
-                onMouseEnter={() => handleHover('Terms')}
-              >
-                Terms
-              </Link>
-              <Link 
-                to="/contact" 
-                className={`${highContrast ? 'text-white hover:text-gray-300' : 'text-gray-300 hover:text-white'} transition-colors duration-200`}
-                onMouseEnter={() => handleHover('Contact')}
-              >
-                Contact
-              </Link>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-700 pt-8">
-            <p className={`${highContrast ? 'text-gray-300' : 'text-gray-400'} text-center text-sm`}>
-              AI Tutor - Helping students with dyslexia learn more effectively
-            </p>
-            <p className={`${highContrast ? 'text-gray-400' : 'text-gray-500'} text-center text-sm mt-1`}>
-              © 2025. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

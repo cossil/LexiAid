@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Book, 
-  FileText, 
-  Upload, 
-  MessageSquare, 
-  Trophy, 
-  Clock, 
-  Calendar, 
-  ChevronRight 
+import {
+  FileText,
+  Upload,
+  MessageSquare,
+  Calendar,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAccessibility } from '../contexts/AccessibilityContext';
@@ -24,15 +21,6 @@ interface Document {
   processingStatus: string;
 }
 
-interface ProgressData {
-  date: Date;
-  studyDuration: number;
-  quizzesTaken: number;
-  questionsAsked: number;
-  documentsRead: number;
-  wordsMastered: number;
-}
-
 interface UserProfile {
   displayName: string;
   uid: string;
@@ -43,9 +31,7 @@ const Dashboard: React.FC = () => {
   const { currentUser } = useAuth();
   const { speakText, uiTtsEnabled, highContrast } = useAccessibility();
   const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
-  const [progressData, setProgressData] = useState<ProgressData | null>(null);
-  const [streak, setStreak] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Function to handle TTS for interactive elements
@@ -59,7 +45,8 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchRecentDocuments = async () => {
       if (!currentUser) return;
-      
+
+      setLoading(true);
       try {
         // Get user's Firebase ID token
         const token = await currentUser.getIdToken();
@@ -99,6 +86,7 @@ const Dashboard: React.FC = () => {
       } catch (error) {
         console.error('Error fetching recent documents:', error);
       }
+      setLoading(false);
     };
     
     fetchRecentDocuments();
@@ -164,55 +152,6 @@ const Dashboard: React.FC = () => {
     fetchUserProfile();
   }, [currentUser]);
 
-  // Fetch user's progress data using backend API for consistency
-  useEffect(() => {
-    const fetchProgressData = async () => {
-      if (!currentUser) return;
-      
-      try {
-        // Get user's Firebase ID token
-        const token = await currentUser.getIdToken();
-        
-        if (!token) {
-          throw new Error('Authentication token not available');
-        }
-
-        // Fetch progress data from the backend API
-        // Note: This would require a backend endpoint for progress data
-        // For now, we'll use placeholder data to avoid errors
-        // When implementing the actual API call, use:
-        // const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-        
-        // TODO: Replace with actual API call when progress endpoint is available
-        // const response = await axios.get(`${apiUrl}/api/progress`, {
-        //   headers: {
-        //     'Authorization': `Bearer ${token}`
-        //   }
-        // });
-        
-        // Use placeholder data for progress
-        setProgressData({
-          date: new Date(),
-          studyDuration: 120, // 2 hours in minutes
-          quizzesTaken: 5,
-          questionsAsked: 15,
-          documentsRead: recentDocuments.length || 0,
-          wordsMastered: 25
-        });
-        
-        // Use placeholder data for streak
-        setStreak(3); // 3-day streak
-        
-      } catch (error) {
-        console.error('Error fetching progress data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchProgressData();
-  }, [currentUser, recentDocuments.length]);
-
   // Format date to human-readable format
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -220,18 +159,6 @@ const Dashboard: React.FC = () => {
       day: 'numeric',
       year: 'numeric'
     }).format(date);
-  };
-
-  // Format duration from minutes to hours and minutes
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
-    }
-    
-    return `${mins}m`;
   };
 
   return (
@@ -259,7 +186,7 @@ const Dashboard: React.FC = () => {
         >
           Quick Actions
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Upload Document */}
           <Link 
             to="/dashboard/upload" 
@@ -273,22 +200,6 @@ const Dashboard: React.FC = () => {
             <Upload className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
             <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
               Upload Document
-            </span>
-          </Link>
-          
-          {/* Start Studying */}
-          <Link 
-            to="/dashboard/study" 
-            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
-              highContrast 
-                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
-                : 'bg-gray-800/50 hover:bg-gray-700/50'
-            } transition-colors duration-200`}
-            onMouseEnter={() => handleHover('Start Studying')}
-          >
-            <Book className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-green-400'}`} aria-hidden="true" />
-            <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
-              Start Studying
             </span>
           </Link>
           
@@ -308,21 +219,6 @@ const Dashboard: React.FC = () => {
             </span>
           </Link>
           
-          {/* View Progress */}
-          <Link 
-            to="/dashboard/progress" 
-            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
-              highContrast 
-                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
-                : 'bg-gray-800/50 hover:bg-gray-700/50'
-            } transition-colors duration-200`}
-            onMouseEnter={() => handleHover('View Progress')}
-          >
-            <Trophy className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-yellow-400'}`} aria-hidden="true" />
-            <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
-              View Progress
-            </span>
-          </Link>
         </div>
       </section>
       
@@ -423,111 +319,7 @@ const Dashboard: React.FC = () => {
         )}
       </section>
       
-      {/* Progress Summary */}
-      <section aria-labelledby="progress-summary-heading">
-        <h2 
-          id="progress-summary-heading" 
-          className={`text-xl font-semibold mb-4 ${highContrast ? 'text-white' : 'text-white'}`}
-          onMouseEnter={() => handleHover('Your Progress')}
-        >
-          Your Progress
-        </h2>
-        
-        {loading ? (
-          <div className={`rounded-lg ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} p-6 flex justify-center`}>
-            <div className="animate-spin h-8 w-8 border-2 border-t-transparent rounded-full border-white"></div>
-          </div>
-        ) : progressData ? (
-          <div>
-            {/* Stats grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {/* Study time */}
-              <div 
-                className={`rounded-lg p-5 ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'}`}
-                onMouseEnter={() => handleHover(`Total study time: ${formatDuration(progressData.studyDuration)}`)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`text-sm ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Study time</span>
-                  <Clock className={`h-5 w-5 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
-                </div>
-                <p className={`text-2xl font-bold ${highContrast ? 'text-white' : 'text-white'}`}>
-                  {formatDuration(progressData.studyDuration)}
-                </p>
-              </div>
-              
-              {/* Documents read */}
-              <div 
-                className={`rounded-lg p-5 ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'}`}
-                onMouseEnter={() => handleHover(`Documents read: ${progressData.documentsRead}`)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`text-sm ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Documents read</span>
-                  <FileText className={`h-5 w-5 ${highContrast ? 'text-white' : 'text-green-400'}`} aria-hidden="true" />
-                </div>
-                <p className={`text-2xl font-bold ${highContrast ? 'text-white' : 'text-white'}`}>
-                  {progressData.documentsRead}
-                </p>
-              </div>
-              
-              {/* Quizzes taken */}
-              <div 
-                className={`rounded-lg p-5 ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'}`}
-                onMouseEnter={() => handleHover(`Quizzes taken: ${progressData.quizzesTaken}`)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`text-sm ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Quizzes taken</span>
-                  <Book className={`h-5 w-5 ${highContrast ? 'text-white' : 'text-purple-400'}`} aria-hidden="true" />
-                </div>
-                <p className={`text-2xl font-bold ${highContrast ? 'text-white' : 'text-white'}`}>
-                  {progressData.quizzesTaken}
-                </p>
-              </div>
-              
-              {/* Current streak */}
-              <div 
-                className={`rounded-lg p-5 ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'}`}
-                onMouseEnter={() => handleHover(`${streak} day streak`)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`text-sm ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>Current streak</span>
-                  <Trophy className={`h-5 w-5 ${highContrast ? 'text-white' : 'text-yellow-400'}`} aria-hidden="true" />
-                </div>
-                <p className={`text-2xl font-bold ${highContrast ? 'text-white' : 'text-white'}`}>
-                  {streak} {streak === 1 ? 'day' : 'days'}
-                </p>
-              </div>
-            </div>
-            
-            <Link 
-              to="/dashboard/progress" 
-              className={`block w-full py-3 rounded-lg text-center ${
-                highContrast 
-                  ? 'bg-white text-black hover:bg-gray-200' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              } font-medium transition-colors duration-200`}
-              onMouseEnter={() => handleHover('View detailed progress')}
-            >
-              View detailed progress
-            </Link>
-          </div>
-        ) : (
-          <div className={`rounded-lg ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} p-8 text-center`}>
-            <p className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}>
-              Start studying to see your progress.
-            </p>
-            <Link 
-              to="/dashboard/study" 
-              className={`inline-flex items-center px-4 py-2 rounded-md ${
-                highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
-              } font-medium transition-colors duration-200`}
-              onMouseEnter={() => handleHover('Start studying now')}
-            >
-              <Book className="h-4 w-4 mr-2" aria-hidden="true" />
-              Start studying now
-            </Link>
-          </div>
-        )}
-      </section>
+      {/* No additional sections beyond recent documents to keep layout clean */}
     </div>
   );
 };

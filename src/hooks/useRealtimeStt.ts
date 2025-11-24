@@ -73,6 +73,11 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
       };
 
       ws.onerror = (err) => {
+        // Suppress error if we are in the process of stopping (review state or manual stop flag)
+        if (manualStopRef.current || status === 'review') {
+          console.log('Suppressing WebSocket error during manual stop:', err);
+          return;
+        }
         console.error('WebSocket error:', err);
         setError('Connection error during dictation.');
         setStatus('idle');
@@ -104,7 +109,11 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
         chunk.arrayBuffer()
           .then((buffer) => {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(buffer);
+              try {
+                wsRef.current.send(buffer);
+              } catch (e) {
+                console.warn('Socket send failed (likely closing):', e);
+              }
             }
           })
           .catch((err) => {
@@ -121,34 +130,52 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
     }
   }, [connectWebSocket, startRecording]);
 
+  const closeSocket = () => {
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch (error) {
+        console.error('Failed to close STT socket:', error);
+      }
+      wsRef.current = null;
+    }
+  };
+
+  const stopStreaming = useCallback((nextStatus: SttStatus, clearTranscript = false) => {
+    manualStopRef.current = true;
+
+    const finalize = () => {
+      if (clearTranscript) {
+        setTranscript({ final: '', interim: '' });
+      }
+      setStatus(nextStatus);
+      
+      // Delay socket closure to allow final audio chunk to flush
+      setTimeout(() => {
+        closeSocket();
+      }, 500);
+    };
+
+    const stopPromise = isRecording ? stopRecording() : Promise.resolve(null);
+    stopPromise
+      .catch((err) => {
+        console.error('Failed to fully stop recorder:', err);
+      })
+      .finally(finalize);
+  }, [isRecording, stopRecording]);
+
   const stopDictation = useCallback(() => {
-    // Guard against multiple calls - make idempotent
-    if (status !== 'dictating') {
-      console.warn('stopDictation called but not in dictating state, current status:', status);
+    if (status !== 'dictating' && status !== 'connecting' && status !== 'requesting_permission') {
+      console.warn('stopDictation called but not in an active state, current status:', status);
       return;
     }
-    
-    manualStopRef.current = true;
-    
-    if (isRecording) {
-      stopRecording();
-    }
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.close();
-    }
-    setStatus('review');
-  }, [status, isRecording, stopRecording]);
+
+    stopStreaming('review');
+  }, [status, stopStreaming]);
 
   const cancelDictation = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    setTranscript({ final: '', interim: '' });
-    setStatus('idle');
-  }, [isRecording, stopRecording]);
+    stopStreaming('idle', true);
+  }, [stopStreaming]);
 
   const stopAndPlay = useCallback((): string => {
     // Guard against multiple calls
@@ -157,26 +184,12 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
       return '';
     }
     
-    manualStopRef.current = true;
-    
-    // Stop recording
-    if (isRecording) {
-      stopRecording();
-    }
-    
-    // Close WebSocket
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.close();
-    }
-    
-    // Transition to review state
-    setStatus('review');
-    
     // Return the current transcript for immediate playback
     const currentTranscript = `${transcript.final}${transcript.interim}`.trim();
     console.log('stopAndPlay: returning transcript of length', currentTranscript.length);
+    stopStreaming('review');
     return currentTranscript;
-  }, [status, isRecording, stopRecording, transcript]);
+  }, [status, stopStreaming, transcript]);
 
   const rerecord = useCallback(async () => {
     await startDictation();

@@ -116,7 +116,7 @@ const SignUp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex-grow flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-gray-800/50 rounded-lg shadow-lg p-8">
         <div className="flex justify-center mb-8">
           <Book 

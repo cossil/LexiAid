@@ -10,6 +10,7 @@ interface HighlightedTextBlockProps {
   activeTimepoint: Timepoint | null;
   onWordClick?: (timeInSeconds: number) => void;
   className?: string;
+  theme?: 'light' | 'dark';
 }
 
 const groupTimepointsIntoParagraphs = (timepoints: Timepoint[]) => {
@@ -50,11 +51,15 @@ export const HighlightedTextBlock: React.FC<HighlightedTextBlockProps> = ({
   activeTimepoint,
   onWordClick,
   className,
+  theme = 'light',
 }) => {
+  const textColorClass = theme === 'light' ? 'text-gray-900' : 'text-gray-100';
+  const highlightClass = theme === 'light' ? 'bg-yellow-200' : 'bg-yellow-500/40';
+
   if (!wordTimepoints || wordTimepoints.length === 0) {
     return (
       <p
-        className={classNames('whitespace-pre-wrap leading-relaxed text-gray-900', className)}
+        className={classNames('whitespace-pre-wrap leading-relaxed', textColorClass, className)}
         aria-live="polite"
       >
         {text}
@@ -67,7 +72,7 @@ export const HighlightedTextBlock: React.FC<HighlightedTextBlockProps> = ({
   return (
     <div className={classNames('space-y-4', className)} aria-live="polite">
       {paragraphs.map((paragraph, pIndex) => (
-        <p key={pIndex} className="leading-relaxed text-gray-900 whitespace-pre-wrap">
+        <p key={pIndex} className={classNames('leading-relaxed whitespace-pre-wrap', textColorClass)}>
           {paragraph.map((timepoint, wIndex) => {
             const isHighlighted =
               !!activeTimepoint &&
@@ -79,7 +84,7 @@ export const HighlightedTextBlock: React.FC<HighlightedTextBlockProps> = ({
                 key={`${pIndex}-${wIndex}`}
                 className={classNames(
                   'px-0.5 rounded transition-colors duration-150',
-                  isHighlighted ? 'bg-yellow-200 dark:bg-yellow-500/70' : 'bg-transparent',
+                  isHighlighted ? highlightClass : 'bg-transparent',
                   onWordClick ? 'cursor-pointer' : 'cursor-default'
                 )}
                 onClick={() => onWordClick?.(timepoint.time_seconds)}
