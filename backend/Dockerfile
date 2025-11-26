@@ -54,6 +54,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install runtime dependencies only (if needed by Google Cloud libraries)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for security
