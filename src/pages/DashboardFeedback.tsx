@@ -13,6 +13,36 @@ const FEEDBACK_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+const getReadableBrowserInfo = (): string => {
+  const ua = window.navigator.userAgent;
+  let browser = "Unknown Browser";
+  let os = "Unknown OS";
+
+  // OS Detection
+  if (ua.includes("Windows")) os = "Windows";
+  else if (ua.includes("Mac")) os = "macOS";
+  else if (ua.includes("Linux")) os = "Linux";
+  else if (ua.includes("Android")) os = "Android";
+  else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+
+  // Browser Detection (Order matters significantly due to UA spoofing)
+  if (ua.includes("Firefox")) {
+    browser = "Firefox";
+  } else if (ua.includes("SamsungBrowser")) {
+    browser = "Samsung Internet";
+  } else if (ua.includes("Opera") || ua.includes("OPR")) {
+    browser = "Opera";
+  } else if (ua.includes("Edg")) { // Edge (Chromium)
+    browser = "Edge";
+  } else if (ua.includes("Chrome")) {
+    browser = "Chrome";
+  } else if (ua.includes("Safari")) {
+    browser = "Safari";
+  }
+
+  return `${browser} on ${os}`;
+};
+
 const DashboardFeedback: React.FC = () => {
   const [type, setType] = useState(FEEDBACK_TYPES[0].value);
   const [description, setDescription] = useState('');
@@ -29,6 +59,19 @@ const DashboardFeedback: React.FC = () => {
     }
   };
 
+  const handleSelectHover = () => {
+    const currentLabel = FEEDBACK_TYPES.find(t => t.value === type)?.label || type;
+    handleHover(`Feedback Type: ${currentLabel}`);
+  };
+
+  const handleTextareaHover = () => {
+    if (!description.trim()) {
+      handleHover("Start typing or use the microphone below to dictate your report...");
+    } else {
+      handleHover("Description field");
+    }
+  };
+
   const {
     playAudio,
     stopAudio,
@@ -39,7 +82,7 @@ const DashboardFeedback: React.FC = () => {
   } = useTTSPlayer(null);
 
   useEffect(() => {
-    setBrowserInfo(window.navigator.userAgent);
+    setBrowserInfo(getReadableBrowserInfo());
   }, []);
 
   const isSubmitDisabled = useMemo(() => {
@@ -129,6 +172,7 @@ const DashboardFeedback: React.FC = () => {
               className="rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-800"
               value={type}
               onChange={(event) => setType(event.target.value)}
+              onMouseEnter={handleSelectHover}
             >
               {FEEDBACK_TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -173,28 +217,29 @@ const DashboardFeedback: React.FC = () => {
              </div>
              
              {/* Read Aloud Button */}
-             <button
-                type="button"
-                onClick={handleReadAloud}
-                disabled={!description.trim()}
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                  !description.trim() 
-                    ? 'text-gray-600 cursor-not-allowed' 
-                    : isPlaying 
-                      ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30' 
-                      : 'text-blue-400 hover:bg-blue-500/10 hover:text-blue-300'
-                }`}
-                onMouseEnter={() => handleHover(isPlaying ? 'Stop Reading' : 'Read Aloud')}
-             >
-                {ttsStatus === 'loading' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isPlaying ? (
-                  <VolumeX className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
-                )}
-                {isPlaying ? 'Stop Reading' : 'Read Aloud'}
-             </button>
+             <div onMouseEnter={() => handleHover(isPlaying ? 'Stop Reading' : 'Read Aloud')}>
+               <button
+                  type="button"
+                  onClick={handleReadAloud}
+                  disabled={!description.trim()}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                    !description.trim() 
+                      ? 'text-gray-600 cursor-not-allowed' 
+                      : isPlaying 
+                        ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30' 
+                        : 'text-blue-400 hover:bg-blue-500/10 hover:text-blue-300'
+                  }`}
+               >
+                  {ttsStatus === 'loading' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isPlaying ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                  {isPlaying ? 'Stop Reading' : 'Read Aloud'}
+               </button>
+             </div>
           </div>
           
           <div className="space-y-3">
@@ -218,6 +263,7 @@ const DashboardFeedback: React.FC = () => {
                 className="min-h-[220px] w-full rounded-2xl border border-gray-600 bg-slate-900 p-5 text-base text-white placeholder-gray-400 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-800"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
+                onMouseEnter={handleTextareaHover}
                 placeholder="Start typing or use the microphone below to dictate your report..."
               />
             )}
@@ -243,14 +289,15 @@ const DashboardFeedback: React.FC = () => {
         )}
 
         <div className="flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={isSubmitDisabled || isPlaying}
-            className="inline-flex items-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold tracking-wide text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-            onMouseEnter={() => handleHover(submitting ? 'Sending…' : 'Submit Feedback')}
-          >
-            {submitting ? 'Sending…' : 'Submit Feedback'}
-          </button>
+          <div onMouseEnter={() => handleHover(submitting ? 'Sending…' : 'Submit Feedback')}>
+            <button
+              type="submit"
+              disabled={isSubmitDisabled || isPlaying}
+              className="inline-flex items-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold tracking-wide text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+            >
+              {submitting ? 'Sending…' : 'Submit Feedback'}
+            </button>
+          </div>
           <span 
             className="text-xs text-gray-500"
             onMouseEnter={() => handleHover('Submissions are private to the LexiAid team and reviewed weekly.')}

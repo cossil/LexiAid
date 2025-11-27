@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { AlertCircle, Loader2, Mic, Square, X } from 'lucide-react';
 import useRealtimeStt, { SttStatus } from '../../hooks/useRealtimeStt';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 
 interface DictationInputProps {
   onTranscript: (textFragment: string) => void;
@@ -28,6 +29,14 @@ const DictationInput: React.FC<DictationInputProps> = ({ onTranscript, onClear, 
     stopDictation,
     cancelDictation,
   } = useRealtimeStt();
+
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
 
   const deliveredLengthRef = useRef(0);
 
@@ -92,58 +101,74 @@ const DictationInput: React.FC<DictationInputProps> = ({ onTranscript, onClear, 
             {isRecording ? <Mic className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </div>
           
-          <div className="flex flex-col">
-            <span className={classNames(
-              "text-sm font-medium",
-              isRecording ? "text-rose-400" : "text-gray-300"
-            )}>
+          <div 
+            className="flex flex-col"
+            onMouseEnter={() => handleHover(`${isRecording ? 'Recording' : 'Dictation'}. ${statusCopy[status]}`)}
+          >
+            <span 
+              className={classNames(
+                "text-sm font-medium",
+                isRecording ? "text-rose-400" : "text-gray-300"
+              )}
+            >
               {isRecording ? 'Recording...' : 'Dictation'}
             </span>
-            <span className="text-xs text-gray-500">{statusCopy[status]}</span>
+            <span className="text-xs text-gray-500">
+              {statusCopy[status]}
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {isRecording ? (
-            <button
-              type="button"
-              onClick={handleStop}
-              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-            >
-              <Square className="h-4 w-4 fill-current" />
-              Stop
-            </button>
+            <div onMouseEnter={() => handleHover('Stop Recording')}>
+              <button
+                type="button"
+                onClick={handleStop}
+                className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+              >
+                <Square className="h-4 w-4 fill-current" />
+                Stop
+              </button>
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={handleStart}
-              disabled={disabled || isBusy}
-              className={classNames(
-                "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50",
-                disabled || isBusy 
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed" 
-                  : "bg-blue-600 hover:bg-blue-500"
-              )}
-            >
-              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-              {isBusy ? 'Connecting...' : 'Start Dictation'}
-            </button>
+            <div onMouseEnter={() => handleHover(isBusy ? 'Connecting...' : 'Start Dictation')}>
+              <button
+                type="button"
+                onClick={handleStart}
+                disabled={disabled || isBusy}
+                className={classNames(
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                  disabled || isBusy 
+                    ? "bg-gray-700 text-gray-400 cursor-not-allowed" 
+                    : "bg-blue-600 hover:bg-blue-500"
+                )}
+              >
+                {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                {isBusy ? 'Connecting...' : 'Start Dictation'}
+              </button>
+            </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleClear}
-            title="Clear Dictation Session"
-            className="inline-flex items-center justify-center rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div onMouseEnter={() => handleHover('Clear Dictation Session')}>
+            <button
+              type="button"
+              onClick={handleClear}
+              title="Clear Dictation Session"
+              className="inline-flex items-center justify-center rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div 
+          className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          onMouseEnter={() => handleHover(`Error: ${error}`)}
+        >
           <AlertCircle className="h-4 w-4 text-red-400" />
           <span>{error}</span>
         </div>
