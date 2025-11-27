@@ -486,14 +486,20 @@ const Settings: React.FC = () => {
               
               <div className="flex flex-col space-y-2">
                  {currentUser?.emailVerified ? (
-                    <div className="flex items-center text-green-500 bg-green-500/10 px-3 py-2 rounded-md w-fit">
+                    <div 
+                        className="flex items-center text-green-500 bg-green-500/10 px-3 py-2 rounded-md w-fit"
+                        onMouseEnter={() => handleHover('Verified')}
+                    >
                         <BadgeCheck className="w-5 h-5 mr-2" />
                         <span className="font-medium">Verified</span>
                     </div>
                  ) : (
                     <div className="flex flex-col space-y-3 w-full max-w-md">
                         <div className={`flex items-center justify-between p-3 rounded-md border ${highContrast ? 'border-white bg-gray-900' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
-                            <div className={`flex items-center ${highContrast ? 'text-white' : 'text-yellow-500'}`}>
+                            <div 
+                                className={`flex items-center ${highContrast ? 'text-white' : 'text-yellow-500'}`}
+                                onMouseEnter={() => handleHover('Not Verified')}
+                            >
                                 <Mail className="w-5 h-5 mr-2" />
                                 <span>Not Verified</span>
                             </div>
@@ -507,14 +513,20 @@ const Settings: React.FC = () => {
                                     {isVerifying ? 'Sending...' : 'Verify Email'}
                                 </button>
                              ) : (
-                                <span className="text-sm text-green-400 font-medium flex items-center">
+                                <span 
+                                    className="text-sm text-green-400 font-medium flex items-center"
+                                    onMouseEnter={() => handleHover('Sent!')}
+                                >
                                     <BadgeCheck className="w-4 h-4 mr-1" />
                                     Sent!
                                 </span>
                              )}
                         </div>
                         {verificationSent && (
-                            <p className={`text-sm italic p-3 rounded-md border ${highContrast ? 'text-white border-white' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}>
+                            <p 
+                                className={`text-sm italic p-3 rounded-md border ${highContrast ? 'text-white border-white' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}
+                                onMouseEnter={() => handleHover(`Verification link sent to ${currentUser?.email}. Please check your Inbox and Spam Folder as the sender may be unknown.`)}
+                            >
                                 Verification link sent to {currentUser?.email}. Please check your Inbox and Spam Folder as the sender may be unknown.
                             </p>
                         )}

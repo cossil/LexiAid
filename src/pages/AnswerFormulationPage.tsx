@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useAccessibility } from '../contexts/AccessibilityContext';
 import useAnswerFormulation from '../hooks/useAnswerFormulation';
 
 // Import all sub-components
@@ -24,6 +25,13 @@ type EditMode = 'none' | 'voice' | 'manual';
 
 const AnswerFormulationPage: React.FC = () => {
   const { userPreferences, updateUserPreferences } = useAuth();
+  const { speakText, uiTtsEnabled } = useAccessibility();
+  
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
   
   // Main state management hook
   const {
@@ -187,10 +195,16 @@ const AnswerFormulationPage: React.FC = () => {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Page Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 
+            className="text-4xl font-bold text-gray-900 mb-2"
+            onMouseEnter={() => handleHover('Answer Formulation')}
+          >
             Answer Formulation
           </h1>
-          <p className="text-lg text-gray-600">
+          <p 
+            className="text-lg text-gray-600"
+            onMouseEnter={() => handleHover('Transform your spoken thoughts into clear, well-written answers')}
+          >
             Transform your spoken thoughts into clear, well-written answers
           </p>
         </div>

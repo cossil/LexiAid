@@ -134,9 +134,9 @@ const DashboardLayout: React.FC = () => {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <Link to="/dashboard" className="flex items-center ml-4" onMouseEnter={() => handleNavLinkHover('AI Tutor Dashboard')}>
+          <Link to="/dashboard" className="flex items-center ml-4" onMouseEnter={() => handleNavLinkHover('LexiAid Dashboard')}>
             <Book className={`mr-2 h-6 w-6 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
-            <span className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-blue-400'}`}>AI Tutor</span>
+            <span className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-blue-400'}`}>LexiAid</span>
           </Link>
         </div>
         
@@ -263,9 +263,9 @@ const DashboardLayout: React.FC = () => {
           <div className={`h-full flex flex-col ${highContrast ? 'bg-black border-r border-white' : 'bg-gray-800'}`}>
             {/* Sidebar header with logo */}
             <div className="flex items-center h-16 flex-shrink-0 px-6">
-              <Link to="/dashboard" className="flex items-center" onMouseEnter={() => handleNavLinkHover('AI Tutor Dashboard')}>
+              <Link to="/dashboard" className="flex items-center" onMouseEnter={() => handleNavLinkHover('LexiAid Dashboard')}>
                 <Book className={`mr-2 h-6 w-6 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
-                <span className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-blue-400'}`}>AI Tutor</span>
+                <span className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-blue-400'}`}>LexiAid</span>
               </Link>
             </div>
             

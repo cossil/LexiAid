@@ -3,6 +3,7 @@ import { Loader2, Volume2, VolumeX } from 'lucide-react';
 import DictationInput from '../components/feedback/DictationInput';
 import { apiService } from '../services/api';
 import { useTTSPlayer } from '../hooks/useTTSPlayer';
+import { useAccessibility } from '../contexts/AccessibilityContext';
 import { HighlightedTextBlock } from '../components/shared/HighlightedTextBlock';
 
 const FEEDBACK_TYPES = [
@@ -19,6 +20,14 @@ const DashboardFeedback: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
 
   const {
     playAudio,
@@ -87,9 +96,22 @@ const DashboardFeedback: React.FC = () => {
   return (
     <div className="mx-auto max-w-4xl py-10">
       <header>
-        <p className="text-sm uppercase tracking-[0.3em] text-blue-400">Voice-friendly feedback</p>
-        <h1 className="mt-2 text-4xl font-semibold text-white">Send Feedback</h1>
-        <p className="mt-3 max-w-2xl text-lg text-gray-300">
+        <p 
+          className="text-sm uppercase tracking-[0.3em] text-blue-400"
+          onMouseEnter={() => handleHover('Voice-friendly feedback')}
+        >
+          Voice-friendly feedback
+        </p>
+        <h1 
+          className="mt-2 text-4xl font-semibold text-white"
+          onMouseEnter={() => handleHover('Send Feedback')}
+        >
+          Send Feedback
+        </h1>
+        <p 
+          className="mt-3 max-w-2xl text-lg text-gray-300"
+          onMouseEnter={() => handleHover('Dictate or type accessibility issues, bugs, or suggestions. We review every submission directly from Firebase Console.')}
+        >
           Dictate or type accessibility issues, bugs, or suggestions. We review every submission directly from Firebase Console.
         </p>
       </header>
@@ -97,7 +119,12 @@ const DashboardFeedback: React.FC = () => {
       <form onSubmit={handleSubmit} className="mt-8 space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-300">Feedback Type</span>
+            <span 
+              className="text-sm font-medium text-gray-300"
+              onMouseEnter={() => handleHover('Feedback Type')}
+            >
+              Feedback Type
+            </span>
             <select
               className="rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-800"
               value={type}
@@ -112,8 +139,16 @@ const DashboardFeedback: React.FC = () => {
           </label>
 
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-gray-300">Browser Details</span>
-            <p className="rounded-xl border border-gray-700 bg-gray-900/60 px-4 py-3 text-sm text-gray-400">
+            <span 
+              className="text-sm font-medium text-gray-300"
+              onMouseEnter={() => handleHover('Browser Details')}
+            >
+              Browser Details
+            </span>
+            <p 
+              className="rounded-xl border border-gray-700 bg-gray-900/60 px-4 py-3 text-sm text-gray-400"
+              onMouseEnter={() => handleHover(browserInfo || 'Collecting browser info…')}
+            >
               {browserInfo || 'Collecting browser info…'}
             </p>
           </div>
@@ -122,10 +157,19 @@ const DashboardFeedback: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-3">
              <div>
-                <label htmlFor="feedback-description" className="text-sm font-medium text-gray-300">
+                <label 
+                  htmlFor="feedback-description" 
+                  className="text-sm font-medium text-gray-300"
+                  onMouseEnter={() => handleHover('Description')}
+                >
                   Description
                 </label>
-                <p className="text-sm text-gray-500">Explain what happened, what you expected, and any assistive tech involved.</p>
+                <p 
+                  className="text-sm text-gray-500"
+                  onMouseEnter={() => handleHover('Explain what happened, what you expected, and any assistive tech involved.')}
+                >
+                  Explain what happened, what you expected, and any assistive tech involved.
+                </p>
              </div>
              
              {/* Read Aloud Button */}
@@ -140,6 +184,7 @@ const DashboardFeedback: React.FC = () => {
                       ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30' 
                       : 'text-blue-400 hover:bg-blue-500/10 hover:text-blue-300'
                 }`}
+                onMouseEnter={() => handleHover(isPlaying ? 'Stop Reading' : 'Read Aloud')}
              >
                 {ttsStatus === 'loading' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -202,10 +247,14 @@ const DashboardFeedback: React.FC = () => {
             type="submit"
             disabled={isSubmitDisabled || isPlaying}
             className="inline-flex items-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold tracking-wide text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+            onMouseEnter={() => handleHover(submitting ? 'Sending…' : 'Submit Feedback')}
           >
             {submitting ? 'Sending…' : 'Submit Feedback'}
           </button>
-          <span className="text-xs text-gray-500">
+          <span 
+            className="text-xs text-gray-500"
+            onMouseEnter={() => handleHover('Submissions are private to the LexiAid team and reviewed weekly.')}
+          >
             Submissions are private to the LexiAid team and reviewed weekly.
           </span>
         </div>

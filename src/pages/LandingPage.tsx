@@ -26,7 +26,9 @@ const LandingPage: React.FC = () => {
       <nav className="w-full py-4 px-6 flex items-center justify-between">
         <div className="flex items-center">
           <Book className={highContrast ? "text-white mr-2" : "text-blue-400 mr-2"} size={24} aria-hidden="true" />
-          <span className={highContrast ? "text-white font-medium text-xl" : "text-blue-400 font-medium text-xl"}>LexiAid</span>
+          <span className={highContrast ? "text-white font-medium text-xl" : "text-blue-400 font-medium text-xl"}>
+            <SpeakableText text="LexiAid" />
+          </span>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -218,10 +220,10 @@ const LandingPage: React.FC = () => {
       <div className={`${highContrast ? 'bg-black' : 'bg-blue-600/20'} py-16 px-6`}>
         <div className="max-w-4xl mx-auto text-center">
           <h2 className={`${highContrast ? 'text-white' : 'text-white'} text-3xl font-bold mb-6`}>
-            Ready to transform your learning experience?
+            <SpeakableText text="Ready to transform your learning experience?" />
           </h2>
           <p className={`${highContrast ? 'text-gray-100' : 'text-gray-300'} text-lg mb-8 max-w-2xl mx-auto`}>
-            Join thousands of students who are already benefiting from LexiAid's personalized learning assistance.
+            <SpeakableText text="Join thousands of students who are already benefiting from LexiAid's personalized learning assistance." />
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
@@ -248,14 +250,13 @@ const LandingPage: React.FC = () => {
       {/* Benefits Section */}
       <div className="w-full max-w-7xl mx-auto px-6 py-16">
         <h2 className={`${highContrast ? 'text-white' : 'text-white'} text-3xl font-bold text-center mb-12`}>
-          Why Choose LexiAid?
+          <SpeakableText text="Why Choose LexiAid?" />
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Benefit items */}
           <div 
             className={`flex items-start ${highContrast ? 'text-white' : 'text-white'}`}
-            onMouseEnter={() => handleHover('Designed specifically for students with dyslexia')}
           >
             <div className={`flex-shrink-0 ${highContrast ? 'text-white' : 'text-green-400'} mr-4`}>
               <CheckCircle size={24} />
@@ -272,7 +273,6 @@ const LandingPage: React.FC = () => {
           
           <div 
             className={`flex items-start ${highContrast ? 'text-white' : 'text-white'}`}
-            onMouseEnter={() => handleHover('Personalized learning pace')}
           >
             <div className={`flex-shrink-0 ${highContrast ? 'text-white' : 'text-green-400'} mr-4`}>
               <CheckCircle size={24} />

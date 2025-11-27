@@ -8,6 +8,7 @@
 import React, { useEffect, useRef } from 'react';
 import { FileQuestion, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface QuestionInputProps {
@@ -20,6 +21,13 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const maxLength = 500;
   const remainingChars = maxLength - value.length;
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
   
   // TTS hook for reading the question aloud
   const {
@@ -60,7 +68,10 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <FileQuestion className="w-6 h-6 text-blue-600" />
-        <h2 className="text-xl font-semibold text-gray-800">
+        <h2 
+          className="text-xl font-semibold text-gray-800"
+          onMouseEnter={() => handleHover('Your Question. Optional but Recommended')}
+        >
           Your Question <span className="text-sm font-normal text-gray-500">(Optional but Recommended)</span>
         </h2>
         
@@ -86,7 +97,10 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
       </div>
 
       {/* Example */}
-      <div className="mb-3 text-sm text-gray-600 italic">
+      <div 
+        className="mb-3 text-sm text-gray-600 italic"
+        onMouseEnter={() => handleHover('Example: "Explain the causes of the American Revolution"')}
+      >
         Example: "Explain the causes of the American Revolution"
       </div>
 
@@ -99,7 +113,10 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
             onWordClick={(time) => seekAndPlay(time)}
             className="text-lg"
           />
-          <p className="text-xs text-blue-700 mt-2 font-medium">
+          <p 
+            className="text-xs text-blue-700 mt-2 font-medium"
+            onMouseEnter={() => handleHover('Listening mode enabled — stop playback to edit your question.')}
+          >
             Listening mode enabled — stop playback to edit your question.
           </p>
         </div>
@@ -124,7 +141,10 @@ const QuestionInput: React.FC<QuestionInputProps> = ({ value, onChange, disabled
 
       {/* Character counter and tip */}
       <div className="mt-3 flex items-start justify-between gap-4">
-        <div className="flex items-start gap-2 text-sm text-gray-600">
+        <div 
+          className="flex items-start gap-2 text-sm text-gray-600"
+          onMouseEnter={() => handleHover('Tip: Adding your question helps organize your answer')}
+        >
           <span className="text-lg">💡</span>
           <span>Tip: Adding your question helps organize your answer</span>
         </div>

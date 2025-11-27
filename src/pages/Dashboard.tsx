@@ -171,9 +171,9 @@ const Dashboard: React.FC = () => {
           Welcome back, {userProfile?.displayName || currentUser?.displayName || 'Student'}
         </h1>
         <p className={`${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
-          onMouseEnter={() => handleHover('Continue your learning journey with AI Tutor')}
+          onMouseEnter={() => handleHover('Continue your learning journey with LexiAid')}
         >
-          Continue your learning journey with AI Tutor
+          Continue your learning journey with LexiAid
         </p>
       </div>
       
@@ -203,7 +203,7 @@ const Dashboard: React.FC = () => {
             </span>
           </Link>
           
-          {/* Chat with AI Tutor */}
+          {/* Chat with LexiAid */}
           <Link 
             to="/dashboard/chat" 
             className={`flex flex-col items-center justify-center p-6 rounded-lg ${
@@ -211,11 +211,11 @@ const Dashboard: React.FC = () => {
                 ? 'bg-gray-900 border border-white hover:bg-gray-800' 
                 : 'bg-gray-800/50 hover:bg-gray-700/50'
             } transition-colors duration-200`}
-            onMouseEnter={() => handleHover('Chat with AI Tutor')}
+            onMouseEnter={() => handleHover('Chat with LexiAid')}
           >
             <MessageSquare className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-purple-400'}`} aria-hidden="true" />
             <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
-              Chat with AI Tutor
+              Chat with LexiAid
             </span>
           </Link>
           
@@ -269,30 +269,60 @@ const Dashboard: React.FC = () => {
                   </h3>
                 </div>
                 
-                <div className={`flex items-center text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>
+                <div 
+                  className={`flex items-center text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}
+                  onMouseEnter={(e) => {
+                    e.stopPropagation();
+                    handleHover(`Last accessed: ${formatDate(doc.lastAccessed)}`);
+                  }}
+                >
                   <Calendar className="h-3 w-3 mr-1" aria-hidden="true" />
                   <span>Last accessed: {formatDate(doc.lastAccessed)}</span>
                 </div>
                 
                 <div className="mt-2 flex items-center justify-between">
-                  <span className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}>
+                  <span 
+                    className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation();
+                      handleHover(`${doc.pageCount} ${doc.pageCount === 1 ? 'page' : 'pages'}`);
+                    }}
+                  >
                     {doc.pageCount} {doc.pageCount === 1 ? 'page' : 'pages'}
                   </span>
                   
                   {doc.processingStatus === 'pending' && (
-                    <span className="text-xs bg-yellow-700/30 text-yellow-300 px-2 py-1 rounded">
+                    <span 
+                      className="text-xs bg-yellow-700/30 text-yellow-300 px-2 py-1 rounded"
+                      onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        handleHover('Status: Processing');
+                      }}
+                    >
                       Processing
                     </span>
                   )}
                   
                   {doc.processingStatus === 'completed' && (
-                    <span className="text-xs bg-green-700/30 text-green-300 px-2 py-1 rounded">
+                    <span 
+                      className="text-xs bg-green-700/30 text-green-300 px-2 py-1 rounded"
+                      onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        handleHover('Status: Ready');
+                      }}
+                    >
                       Ready
                     </span>
                   )}
                   
                   {doc.processingStatus === 'error' && (
-                    <span className="text-xs bg-red-700/30 text-red-300 px-2 py-1 rounded">
+                    <span 
+                      className="text-xs bg-red-700/30 text-red-300 px-2 py-1 rounded"
+                      onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        handleHover('Status: Error');
+                      }}
+                    >
                       Error
                     </span>
                   )}
@@ -302,7 +332,10 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className={`rounded-lg ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} p-8 text-center`}>
-            <p className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}>
+            <p 
+              className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}
+              onMouseEnter={() => handleHover('You haven\'t uploaded any documents yet.')}
+            >
               You haven't uploaded any documents yet.
             </p>
             <Link 

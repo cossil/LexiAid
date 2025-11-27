@@ -8,6 +8,7 @@
 import React from 'react';
 import { Sparkles, Volume2, VolumeX, Loader2, Check, Mic, Edit3, RotateCcw } from 'lucide-react';
 import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface RefinementPanelProps {
@@ -34,6 +35,13 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
 }) => {
   const isRefining = status === 'refining';
   const isEditing = status === 'editing';
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
   
   // Separate TTS players for original transcript and refined answer
   const { 
@@ -88,7 +96,10 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-6 h-6 text-purple-600" />
-        <h2 className="text-xl font-semibold text-gray-800">
+        <h2 
+          className="text-xl font-semibold text-gray-800"
+          onMouseEnter={() => handleHover(refinedAnswer ? 'Review Your Answer' : 'Ready to Refine')}
+        >
           {refinedAnswer ? 'Review Your Answer' : 'Ready to Refine'}
         </h2>
       </div>
@@ -98,7 +109,12 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
         {/* Original Transcript Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-700">Your Spoken Thoughts (Original)</h3>
+            <h3 
+              className="text-sm font-semibold text-gray-700"
+              onMouseEnter={() => handleHover('Your Spoken Thoughts (Original)')}
+            >
+              Your Spoken Thoughts (Original)
+            </h3>
             
             {/* TTS Speaker Button for Original Transcript */}
             {originalTranscript && (
@@ -136,7 +152,12 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
         {/* Refined Answer Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-700">Refined Answer</h3>
+            <h3 
+              className="text-sm font-semibold text-gray-700"
+              onMouseEnter={() => handleHover('Refined Answer')}
+            >
+              Refined Answer
+            </h3>
             
             {/* TTS Speaker Button for Refined Answer */}
             {refinedAnswer && (
@@ -164,13 +185,28 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
             {isRefining ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
                 <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-gray-600 font-medium">Refining your answer...</p>
-                <p className="text-sm text-gray-500">This may take a few seconds</p>
+                <p 
+                  className="text-gray-600 font-medium"
+                  onMouseEnter={() => handleHover('Refining your answer...')}
+                >
+                  Refining your answer...
+                </p>
+                <p 
+                  className="text-sm text-gray-500"
+                  onMouseEnter={() => handleHover('This may take a few seconds')}
+                >
+                  This may take a few seconds
+                </p>
               </div>
             ) : isEditing ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-gray-600 font-medium">Applying your edit...</p>
+                <p 
+                  className="text-gray-600 font-medium"
+                  onMouseEnter={() => handleHover('Applying your edit...')}
+                >
+                  Applying your edit...
+                </p>
               </div>
             ) : refinedAnswer ? (
               <HighlightedTextBlock
@@ -182,7 +218,10 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
               />
             ) : (
               <div className="flex items-center justify-center h-full">
-                <p className="text-gray-400 italic text-center">
+                <p 
+                  className="text-gray-400 italic text-center"
+                  onMouseEnter={() => handleHover('Click "Refine My Answer" to transform your spoken thoughts into clear writing')}
+                >
                   Click "Refine My Answer" to transform your spoken thoughts into clear writing
                 </p>
               </div>
@@ -204,6 +243,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                      disabled:bg-gray-400 disabled:cursor-not-allowed
                      focus:outline-none focus:ring-4 focus:ring-purple-300
                      flex items-center gap-2"
+            onMouseEnter={() => handleHover('Refine My Answer')}
           >
             <Sparkles className="w-6 h-6" />
             Refine My Answer
@@ -215,6 +255,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                        transition-colors duration-200
                        focus:outline-none focus:underline
                        flex items-center gap-2"
+              onMouseEnter={() => handleHover('Start Over')}
             >
               <RotateCcw className="w-4 h-4" />
               Start Over
@@ -225,7 +266,12 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
         // Show action buttons after refinement
         <div className="space-y-4">
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-sm font-medium text-blue-900 mb-2">What would you like to do?</p>
+            <p 
+              className="text-sm font-medium text-blue-900 mb-2"
+              onMouseEnter={() => handleHover('What would you like to do?')}
+            >
+              What would you like to do?
+            </p>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={onFinalize}
@@ -234,6 +280,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                          transition-all duration-200
                          focus:outline-none focus:ring-4 focus:ring-green-300
                          flex items-center justify-center gap-2"
+                onMouseEnter={() => handleHover('Finalize Answer')}
               >
                 <Check className="w-5 h-5" />
                 Finalize Answer
@@ -246,6 +293,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                          transition-all duration-200
                          focus:outline-none focus:ring-4 focus:ring-blue-300
                          flex items-center justify-center gap-2"
+                onMouseEnter={() => handleHover('Edit with Voice')}
               >
                 <Mic className="w-5 h-5" />
                 Edit with Voice
@@ -258,6 +306,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                          transition-all duration-200
                          focus:outline-none focus:ring-4 focus:ring-indigo-300
                          flex items-center justify-center gap-2"
+                onMouseEnter={() => handleHover('Edit Manually')}
               >
                 <Edit3 className="w-5 h-5" />
                 Edit Manually
@@ -273,6 +322,7 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({
                          transition-colors duration-200
                          focus:outline-none focus:underline
                          flex items-center gap-2"
+                onMouseEnter={() => handleHover('Start Over')}
               >
                 <RotateCcw className="w-4 h-4" />
                 Start Over

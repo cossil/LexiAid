@@ -163,9 +163,17 @@ const DocumentView: React.FC = () => {
         return (
           <div className="p-6 h-full flex flex-col items-center justify-center">
             <MessageSquare className={`h-16 w-16 mb-4 ${highContrast ? 'text-white' : 'text-blue-400'}`} />
-            <h2 className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}>Ask Questions</h2>
-            <p className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}>
-              Chat with AI Tutor about this document to get summaries or explanations.
+            <h2 
+              className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}
+              onMouseEnter={() => handleHover('Ask Questions')}
+            >
+              Ask Questions
+            </h2>
+            <p 
+              className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
+              onMouseEnter={() => handleHover('Chat with LexiAid about this document to get summaries or explanations.')}
+            >
+              Chat with LexiAid about this document to get summaries or explanations.
             </p>
             <button
               className={`px-6 py-3 rounded-md ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'} font-medium transition-colors duration-200 flex items-center`}
@@ -180,8 +188,16 @@ const DocumentView: React.FC = () => {
         return (
           <div className="p-6 h-full flex flex-col items-center justify-center">
             <Layers className={`h-16 w-16 mb-4 ${highContrast ? 'text-white' : 'text-green-400'}`} />
-            <h2 className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}>Test Your Knowledge</h2>
-            <p className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}>
+            <h2 
+              className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}
+              onMouseEnter={() => handleHover('Test Your Knowledge')}
+            >
+              Test Your Knowledge
+            </h2>
+            <p 
+              className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
+              onMouseEnter={() => handleHover('Generate quizzes based on this document to test your understanding.')}
+            >
               Generate quizzes based on this document to test your understanding.
             </p>
             <button
@@ -228,14 +244,31 @@ const DocumentView: React.FC = () => {
         </div>
         {showSettings && (
           <div className={`mb-6 p-4 rounded-lg ${highContrast ? 'bg-gray-800' : 'bg-gray-700'}`}>
-            <h2 className={`text-lg font-semibold mb-3 ${highContrast ? 'text-white' : 'text-white'}`}>Reading Settings</h2>
+            <h2 
+              className={`text-lg font-semibold mb-3 ${highContrast ? 'text-white' : 'text-white'}`}
+              onMouseEnter={() => handleHover('Reading Settings')}
+            >
+              Reading Settings
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label htmlFor="font-size" className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}>Font Size: {fontSize}px</label>
+                <label 
+                  htmlFor="font-size" 
+                  className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}
+                  onMouseEnter={() => handleHover(`Font Size: ${fontSize} pixels`)}
+                >
+                  Font Size: {fontSize}px
+                </label>
                 <input id="font-size" type="range" min="12" max="28" step="1" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="w-full" />
               </div>
               <div>
-                <label htmlFor="line-spacing" className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}>Line Spacing: {lineSpacing}</label>
+                <label 
+                  htmlFor="line-spacing" 
+                  className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}
+                  onMouseEnter={() => handleHover(`Line Spacing: ${lineSpacing}`)}
+                >
+                  Line Spacing: {lineSpacing}
+                </label>
                 <input id="line-spacing" type="range" min="1" max="3" step="0.1" value={lineSpacing} onChange={(e) => setLineSpacing(Number(e.target.value))} className="w-full" />
               </div>
               <div className="flex items-center">

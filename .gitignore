@@ -11,3 +11,11 @@
 # Environment variables with secret credentials
 backend/.env
 .env
+
+# Specif files
+n8n.yaml
+output.mp3
+
+# Temporary Debug Artifacts & Logs
+backend/debug_audio/
+*.log

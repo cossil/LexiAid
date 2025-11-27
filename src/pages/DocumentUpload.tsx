@@ -219,14 +219,25 @@ const DocumentUpload: React.FC = () => {
         <div className="flex items-start">
           <Info className={`mr-3 h-5 w-5 flex-shrink-0 ${highContrast ? 'text-white' : 'text-blue-400'}`} />
           <div>
-            <h2 className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'} mb-2`}>
-              Document Processing with AI Tutor
+            <h2 
+              className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'} mb-2`}
+              onMouseEnter={() => handleHover('Document Processing with LexiAid')}
+            >
+              Document Processing with LexiAid
             </h2>
             <ul className={`list-disc list-inside space-y-1 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}>
-              <li>Upload any document: PDF, image with text, Word document, or text file</li>
-              <li>AI Tutor will process the text content, making it accessible for your learning</li>
-              <li>Once processed, you can read, get summaries, and ask questions about the material</li>
-              <li>Maximum file size: 15MB</li>
+              <li onMouseEnter={() => handleHover('Upload any document: PDF, image with text, Word document, or text file')}>
+                Upload any document: PDF, image with text, Word document, or text file
+              </li>
+              <li onMouseEnter={() => handleHover('LexiAid will process the text content, making it accessible for your learning')}>
+                LexiAid will process the text content, making it accessible for your learning
+              </li>
+              <li onMouseEnter={() => handleHover('Once processed, you can read, get summaries, and ask questions about the material')}>
+                Once processed, you can read, get summaries, and ask questions about the material
+              </li>
+              <li onMouseEnter={() => handleHover('Maximum file size: 15MB')}>
+                Maximum file size: 15MB
+              </li>
             </ul>
           </div>
         </div>
@@ -284,13 +295,22 @@ const DocumentUpload: React.FC = () => {
             {files.length === 0 ? (
               <div className="space-y-3">
                 <Upload className={`mx-auto h-12 w-12 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
-                <h3 className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
+                <h3 
+                  className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
+                  onMouseEnter={() => handleHover('Drag and drop your file here')}
+                >
                   Drag and drop your file here
                 </h3>
-                <p className={`${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
+                <p 
+                  className={`${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+                  onMouseEnter={() => handleHover('or browse to upload')}
+                >
                   or <span className={`${highContrast ? 'text-white underline' : 'text-blue-400'}`}>browse</span> to upload
                 </p>
-                <p className={`text-sm ${highContrast ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p 
+                  className={`text-sm ${highContrast ? 'text-gray-400' : 'text-gray-500'}`}
+                  onMouseEnter={() => handleHover('Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX')}
+                >
                   Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX
                 </p>
               </div>
@@ -309,10 +329,16 @@ const DocumentUpload: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <h3 className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
+                <h3 
+                  className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
+                  onMouseEnter={() => handleHover(files[0].name)}
+                >
                   {files[0].name}
                 </h3>
-                <p className={`text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
+                <p 
+                  className={`text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+                  onMouseEnter={() => handleHover(`${MIME_TYPE_NAMES[files[0].type] || 'Document'} • ${(files[0].size / 1024 / 1024).toFixed(2)} megabytes`)}
+                >
                   {MIME_TYPE_NAMES[files[0].type] || 'Document'} • {(files[0].size / 1024 / 1024).toFixed(2)} MB
                 </p>
                 <button
@@ -358,7 +384,10 @@ const DocumentUpload: React.FC = () => {
               aria-required="true"
               disabled={isUploading}
             />
-            <p className={`mt-1 text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
+            <p 
+              className={`mt-1 text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+              onMouseEnter={() => handleHover('This name will help you identify the document later')}
+            >
               This name will help you identify the document later
             </p>
           </div>

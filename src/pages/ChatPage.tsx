@@ -247,7 +247,7 @@ const ChatPage: React.FC = () => {
 
         <div>
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {isQuiz ? 'Quiz Mode' : 'Chat with AI Tutor'}
+            {isQuiz ? 'Quiz Mode' : 'Chat with LexiAid'}
           </h1>
           {documentIdFromUrl && (
             <p className="text-sm text-gray-500 dark:text-gray-400">

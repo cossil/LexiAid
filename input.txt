@@ -1,1 +1,0 @@
-Hello, this is a test of the Google Cloud Text-to-Speech service with word timepoints.

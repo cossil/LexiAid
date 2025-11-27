@@ -8,6 +8,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Mic, Square, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { useTTSPlayer } from '../../hooks/useTTSPlayer';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
 
 interface DictationPanelProps {
@@ -35,6 +36,13 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
 }) => {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const wordCount = transcript.split(/\s+/).filter(word => word.length > 0).length;
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
   
   // TTS hook for reading the transcript aloud
   const {
@@ -72,7 +80,10 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-blue-600'}`} />
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 
+            className="text-xl font-semibold text-gray-800"
+            onMouseEnter={() => handleHover(isRecording ? 'Listening...' : 'Speak Your Thoughts')}
+          >
             {isRecording ? 'Listening...' : 'Speak Your Thoughts'}
           </h2>
           {isRecording && (
@@ -82,7 +93,10 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
         
         {/* Auto-pause indicator */}
         {isRecording && autoPauseEnabled && pauseCountdown === null && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div 
+            className="flex items-center gap-2 text-sm text-gray-600"
+            onMouseEnter={() => handleHover('Auto-pause enabled')}
+          >
             <span>⏱️</span>
             <span>Auto-pause enabled</span>
           </div>
@@ -107,8 +121,16 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
             >
               <Mic className="w-16 h-16 text-white" />
             </button>
-            <p className="text-lg font-medium text-gray-700">Start Dictating</p>
-            <p className="text-sm text-gray-500 text-center max-w-md">
+            <p 
+              className="text-lg font-medium text-gray-700"
+              onMouseEnter={() => handleHover('Start Dictating')}
+            >
+              Start Dictating
+            </p>
+            <p 
+              className="text-sm text-gray-500 text-center max-w-md"
+              onMouseEnter={() => handleHover('Speak freely. Don\'t worry about organization.')}
+            >
               Speak freely. Don't worry about organization.
             </p>
           </>
@@ -124,7 +146,12 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
             {/* Transcript display */}
             <div className="w-full space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Transcript</span>
+                <span 
+                  className="text-sm font-medium text-gray-700"
+                  onMouseEnter={() => handleHover('Transcript')}
+                >
+                  Transcript
+                </span>
                 
                 {/* TTS Speaker Button */}
                 {transcript && (
@@ -171,7 +198,12 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
                   </p>
                 )}
                 {!transcript && !interimTranscript && (
-                  <p className="text-gray-400 italic">Your speech will appear here...</p>
+                  <p 
+                    className="text-gray-400 italic"
+                    onMouseEnter={() => handleHover('Your speech will appear here...')}
+                  >
+                    Your speech will appear here...
+                  </p>
                 )}
               </div>
             </div>
@@ -180,7 +212,10 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
             {pauseCountdown !== null && pauseCountdown > 0 && (
               <div className="w-full p-4 bg-yellow-50 border-2 border-yellow-300 rounded-md">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-yellow-800">
+                  <span 
+                    className="text-sm font-medium text-yellow-800"
+                    onMouseEnter={() => handleHover(`Pause detected: Auto-stopping in ${pauseCountdown.toFixed(1)} seconds`)}
+                  >
                     Pause detected: Auto-stopping in {pauseCountdown.toFixed(1)}s
                   </span>
                 </div>
@@ -190,7 +225,12 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
                     style={{ width: `${(pauseCountdown / 3) * 100}%` }}
                   />
                 </div>
-                <p className="text-xs text-yellow-700 mt-1">(Resume speaking to cancel)</p>
+                <p 
+                  className="text-xs text-yellow-700 mt-1"
+                  onMouseEnter={() => handleHover('Resume speaking to cancel')}
+                >
+                  (Resume speaking to cancel)
+                </p>
               </div>
             )}
           </>

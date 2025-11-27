@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle, Copy, Download, RotateCcw, Check } from 'lucide-react';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 
 interface FinalizedAnswerProps {
   answer: string;
@@ -26,6 +27,13 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
   onStartNew,
 }) => {
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const { speakText, uiTtsEnabled } = useAccessibility();
+
+  const handleHover = (text: string) => {
+    if (uiTtsEnabled) {
+      speakText(text);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -69,7 +77,10 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
         <div className="animate-bounce">
           <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-green-800">
+        <h2 
+          className="text-2xl font-bold text-green-800"
+          onMouseEnter={() => handleHover('Your Answer is Ready!')}
+        >
           Your Answer is Ready!
         </h2>
       </div>
@@ -80,17 +91,24 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
           <p 
             className="text-lg text-gray-900 whitespace-pre-wrap leading-relaxed select-text"
             style={{ fontFamily: 'OpenDyslexic, sans-serif' }}
+            onMouseEnter={() => handleHover(answer)}
           >
             {answer}
           </p>
           
           {/* Metadata */}
           <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap gap-4 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
+            <div 
+              className="flex items-center gap-2"
+              onMouseEnter={() => handleHover(`Word count: ${wordCount} words`)}
+            >
               <span className="font-semibold">Word count:</span>
               <span>{wordCount} words</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div 
+              className="flex items-center gap-2"
+              onMouseEnter={() => handleHover(`Refinement iterations: ${iterationCount}`)}
+            >
               <span className="font-semibold">Refinement iterations:</span>
               <span>{iterationCount}</span>
             </div>
@@ -101,7 +119,12 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
       {/* Action buttons */}
       <div className="space-y-4">
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm font-medium text-blue-900 mb-3">What would you like to do?</p>
+          <p 
+            className="text-sm font-medium text-blue-900 mb-3"
+            onMouseEnter={() => handleHover('What would you like to do?')}
+          >
+            What would you like to do?
+          </p>
           
           <div className="flex flex-wrap gap-3">
             <button
@@ -111,6 +134,7 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
                        transition-all duration-200
                        focus:outline-none focus:ring-4 focus:ring-blue-300
                        flex items-center justify-center gap-2"
+              onMouseEnter={() => handleHover('Copy to Clipboard')}
             >
               {showCopiedToast ? (
                 <>
@@ -132,6 +156,7 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
                        transition-all duration-200
                        focus:outline-none focus:ring-4 focus:ring-indigo-300
                        flex items-center justify-center gap-2"
+              onMouseEnter={() => handleHover('Download as Text')}
             >
               <Download className="w-5 h-5" />
               Download as Text
@@ -148,6 +173,7 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
                      transition-all duration-200
                      focus:outline-none focus:ring-4 focus:ring-green-300
                      flex items-center gap-2"
+            onMouseEnter={() => handleHover('Start New Answer')}
           >
             <RotateCcw className="w-5 h-5" />
             Start New Answer
@@ -157,7 +183,10 @@ const FinalizedAnswer: React.FC<FinalizedAnswerProps> = ({
 
       {/* Helpful tip */}
       <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-        <p className="text-sm text-yellow-800 flex items-start gap-2">
+        <p 
+          className="text-sm text-yellow-800 flex items-start gap-2"
+          onMouseEnter={() => handleHover('Tip: Paste this into your assignment document or save it for later reference.')}
+        >
           <span className="text-lg">💡</span>
           <span><strong>Tip:</strong> Paste this into your assignment document or save it for later reference.</span>
         </p>
