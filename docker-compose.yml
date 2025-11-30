@@ -14,7 +14,7 @@ services:
     networks:
       - hankellnet
     env_file:
-      - ./backend/.env
+      - .env
     volumes:
       - lexiaid-backend-data:/app/data
       - lexiaid-backend-logs:/app/logs

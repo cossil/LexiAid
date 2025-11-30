@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Upload, 
-  File, 
+  File as FileIcon, 
   X, 
   AlertCircle, 
   CheckCircle, 
@@ -25,9 +25,9 @@ const ALLOWED_TYPES = [
 
 const FILE_TYPE_ICONS: Record<string, React.ReactNode> = {
   'application/pdf': <FileText className="text-red-400" />,
-  'image/png': <File className="text-blue-400" />,
-  'image/jpeg': <File className="text-blue-400" />,
-  'text/plain': <File className="text-gray-400" />,
+  'image/png': <FileIcon className="text-blue-400" />,
+  'image/jpeg': <FileIcon className="text-blue-400" />,
+  'text/plain': <FileIcon className="text-gray-400" />,
   'application/msword': <FileText className="text-blue-400" />,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': <FileText className="text-blue-400" />
 };
@@ -56,6 +56,11 @@ const DocumentUpload: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
   const [documentName, setDocumentName] = useState<string>('');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'file' | 'text'>(
+    (location.state as any)?.initialTab === 'text' ? 'text' : 'file'
+  );
+  const [pastedText, setPastedText] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -144,8 +149,10 @@ const DocumentUpload: React.FC = () => {
     }
   };
 
-  const handleUpload = async () => {
-    if (files.length === 0) {
+  const handleUpload = async (fileOverride?: File) => {
+    const fileToUpload = fileOverride || files[0];
+
+    if (!fileToUpload) {
       setError('Please select a file to upload');
       return;
     }
@@ -160,7 +167,7 @@ const DocumentUpload: React.FC = () => {
     setError('');
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('file', fileToUpload);
     formData.append('name', documentName);
 
     try {
@@ -204,6 +211,17 @@ const DocumentUpload: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleTextSubmission = async () => {
+    if (!pastedText.trim()) {
+      setError('Please enter some text content');
+      return;
+    }
+
+    const fileName = (documentName.trim() || 'Untitled') + '.txt';
+    const virtualFile = new File([pastedText], fileName, { type: 'text/plain' });
+    await handleUpload(virtualFile);
   };
 
   return (
@@ -266,107 +284,157 @@ const DocumentUpload: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* File upload area */}
-          <div 
-            className={`mb-6 border-2 border-dashed rounded-lg p-10 text-center ${
-              highContrast 
-                ? 'border-white hover:border-gray-300 bg-gray-900' 
-                : 'border-gray-600 hover:border-blue-500 bg-gray-800/30'
-            } transition-colors duration-200 cursor-pointer`}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={handleBrowseClick}
-            onMouseEnter={() => handleHover('Drag and drop your file here, or click to browse')}
-            role="button"
-            aria-label="Upload document area"
-            tabIndex={0}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx"
-              onChange={handleFileInputChange}
-              aria-hidden="true"
-            />
-            
-            {files.length === 0 ? (
-              <div className="space-y-3">
-                <Upload className={`mx-auto h-12 w-12 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
-                <h3 
-                  className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
-                  onMouseEnter={() => handleHover('Drag and drop your file here')}
-                >
-                  Drag and drop your file here
-                </h3>
-                <p 
-                  className={`${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
-                  onMouseEnter={() => handleHover('or browse to upload')}
-                >
-                  or <span className={`${highContrast ? 'text-white underline' : 'text-blue-400'}`}>browse</span> to upload
-                </p>
-                <p 
-                  className={`text-sm ${highContrast ? 'text-gray-400' : 'text-gray-500'}`}
-                  onMouseEnter={() => handleHover('Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX')}
-                >
-                  Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex justify-center">
-                  {files[0].type.startsWith('image/') && files[0].preview ? (
-                    <img 
-                      src={files[0].preview} 
-                      alt="Document preview" 
-                      className="h-32 object-contain rounded border border-gray-700"
-                    />
-                  ) : (
-                    <div className={`h-16 w-16 flex items-center justify-center rounded-full ${highContrast ? 'bg-white' : 'bg-gray-700'}`}>
-                      {FILE_TYPE_ICONS[files[0].type] || <File className={highContrast ? 'text-black' : 'text-gray-300'} />}
-                    </div>
-                  )}
-                </div>
-                <h3 
-                  className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
-                  onMouseEnter={() => handleHover(files[0].name)}
-                >
-                  {files[0].name}
-                </h3>
-                <p 
-                  className={`text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
-                  onMouseEnter={() => handleHover(`${MIME_TYPE_NAMES[files[0].type] || 'Document'} • ${(files[0].size / 1024 / 1024).toFixed(2)} megabytes`)}
-                >
-                  {MIME_TYPE_NAMES[files[0].type] || 'Document'} • {(files[0].size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveFile();
-                  }}
-                  className={`inline-flex items-center px-3 py-1 rounded ${
-                    highContrast 
-                      ? 'bg-white text-black hover:bg-gray-200' 
-                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-                  } text-sm transition-colors duration-200`}
-                  aria-label="Remove file"
-                  onMouseEnter={() => handleHover('Remove file')}
-                >
-                  <X className="h-4 w-4 mr-1" aria-hidden="true" />
-                  Remove
-                </button>
-              </div>
-            )}
+          {/* Tabs */}
+          <div className="flex space-x-4 mb-6">
+            <button
+              onClick={() => setActiveTab('file')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors duration-200 ${
+                activeTab === 'file'
+                  ? (highContrast ? 'bg-white text-black' : 'bg-blue-600 text-white')
+                  : (highContrast ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')
+              }`}
+              onMouseEnter={() => handleHover('Upload File Tab')}
+            >
+              Upload File
+            </button>
+            <button
+              onClick={() => setActiveTab('text')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors duration-200 ${
+                activeTab === 'text'
+                  ? (highContrast ? 'bg-white text-black' : 'bg-blue-600 text-white')
+                  : (highContrast ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')
+              }`}
+              onMouseEnter={() => handleHover('Paste Text Tab')}
+            >
+              Paste Text
+            </button>
           </div>
+
+          {/* File upload area */}
+          {activeTab === 'file' ? (
+            <div 
+              className={`mb-6 border-2 border-dashed rounded-lg p-10 text-center ${
+                highContrast 
+                  ? 'border-white hover:border-gray-300 bg-gray-900' 
+                  : 'border-gray-600 hover:border-blue-500 bg-gray-800/30'
+              } transition-colors duration-200 cursor-pointer`}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={handleBrowseClick}
+              onMouseEnter={() => handleHover('Drag and drop your file here, or click to browse')}
+              role="button"
+              aria-label="Upload document area"
+              tabIndex={0}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx"
+                onChange={handleFileInputChange}
+                aria-hidden="true"
+              />
+              
+              {files.length === 0 ? (
+                <div className="space-y-3">
+                  <Upload className={`mx-auto h-12 w-12 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
+                  <h3 
+                    className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
+                    onMouseEnter={() => handleHover('Drag and drop your file here')}
+                  >
+                    Drag and drop your file here
+                  </h3>
+                  <p 
+                    className={`${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+                    onMouseEnter={() => handleHover('or browse to upload')}
+                  >
+                    or <span className={`${highContrast ? 'text-white underline' : 'text-blue-400'}`}>browse</span> to upload
+                  </p>
+                  <p 
+                    className={`text-sm ${highContrast ? 'text-gray-400' : 'text-gray-500'}`}
+                    onMouseEnter={() => handleHover('Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX')}
+                  >
+                    Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-center">
+                    {files[0].type.startsWith('image/') && files[0].preview ? (
+                      <img 
+                        src={files[0].preview} 
+                        alt="Document preview" 
+                        className="h-32 object-contain rounded border border-gray-700"
+                      />
+                    ) : (
+                      <div className={`h-16 w-16 flex items-center justify-center rounded-full ${highContrast ? 'bg-white' : 'bg-gray-700'}`}>
+                        {FILE_TYPE_ICONS[files[0].type] || <FileIcon className={highContrast ? 'text-black' : 'text-gray-300'} />}
+                      </div>
+                    )}
+                  </div>
+                  <h3 
+                    className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
+                    onMouseEnter={() => handleHover(files[0].name)}
+                  >
+                    {files[0].name}
+                  </h3>
+                  <p 
+                    className={`text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+                    onMouseEnter={() => handleHover(`${MIME_TYPE_NAMES[files[0].type] || 'Document'} • ${(files[0].size / 1024 / 1024).toFixed(2)} megabytes`)}
+                  >
+                    {MIME_TYPE_NAMES[files[0].type] || 'Document'} • {(files[0].size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveFile();
+                    }}
+                    className={`inline-flex items-center px-3 py-1 rounded ${
+                      highContrast 
+                        ? 'bg-white text-black hover:bg-gray-200' 
+                        : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                    } text-sm transition-colors duration-200`}
+                    aria-label="Remove file"
+                    onMouseEnter={() => handleHover('Remove file')}
+                  >
+                    <X className="h-4 w-4 mr-1" aria-hidden="true" />
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Paste Text Area
+            <div className="mb-6">
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="Paste your text here..."
+                className={`w-full h-64 p-4 rounded-lg resize-none ${
+                  highContrast 
+                    ? 'bg-gray-900 text-white border border-white focus:border-blue-500' 
+                    : 'bg-gray-800/50 text-gray-200 border border-gray-700 focus:border-blue-500'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                onMouseEnter={() => handleHover('Paste your text content here')}
+              />
+              <p 
+                className={`mt-2 text-sm text-right ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
+                onMouseEnter={() => handleHover(`${pastedText.length} characters`)}
+              >
+                {pastedText.length} characters
+              </p>
+            </div>
+          )}
           
           {/* Document name input */}
           <div className="mb-8">
             <label 
               htmlFor="document-name" 
               className={`block text-sm font-medium mb-2 ${highContrast ? 'text-white' : 'text-gray-300'}`}
+              onMouseEnter={() => handleHover('Document Name')}
             >
               Document Name
             </label>
@@ -383,6 +451,7 @@ const DocumentUpload: React.FC = () => {
               placeholder="Enter a name for your document"
               aria-required="true"
               disabled={isUploading}
+              onMouseEnter={() => handleHover('Document Name field. Enter a name for your document.')}
             />
             <p 
               className={`mt-1 text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
@@ -432,29 +501,30 @@ const DocumentUpload: React.FC = () => {
               Cancel
             </button>
             
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={isUploading || files.length === 0}
-              className={`px-6 py-2 rounded-md ${
-                highContrast 
-                  ? 'bg-white text-black hover:bg-gray-200 disabled:bg-gray-500 disabled:text-gray-800' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-500/50 disabled:text-gray-300'
-              } font-medium transition-colors duration-200 flex items-center`}
-              onMouseEnter={() => handleHover(isUploading ? 'Uploading...' : 'Upload Document')}
-            >
-              {isUploading ? (
-                <>
-                  <Loader className="animate-spin h-5 w-5 mr-2" aria-hidden="true" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-5 w-5 mr-2" aria-hidden="true" />
-                  Upload Document
-                </>
-              )}
-            </button>
+            <div onMouseEnter={() => handleHover(isUploading ? 'Uploading...' : (activeTab === 'file' ? 'Upload Document' : 'Save Text Document'))}>
+              <button
+                type="button"
+                onClick={() => activeTab === 'file' ? handleUpload() : handleTextSubmission()}
+                disabled={isUploading || (activeTab === 'file' ? files.length === 0 : !pastedText.trim())}
+                className={`px-6 py-2 rounded-md ${
+                  highContrast 
+                    ? 'bg-white text-black hover:bg-gray-200 disabled:bg-gray-500 disabled:text-gray-800' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-500/50 disabled:text-gray-300'
+                } font-medium transition-colors duration-200 flex items-center`}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader className="animate-spin h-5 w-5 mr-2" aria-hidden="true" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5 mr-2" aria-hidden="true" />
+                    {activeTab === 'file' ? 'Upload Document' : 'Save Text Document'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </>
       )}

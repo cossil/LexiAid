@@ -250,7 +250,7 @@ class TTSService:
         import re
 
         # Determine defaults from environment variables
-        final_voice_name = voice_name if voice_name is not None else os.getenv('TTS_DEFAULT_VOICE_NAME', "en-US-Standard-C")
+        final_voice_name = voice_name if voice_name is not None else os.getenv('TTS_DEFAULT_VOICE_NAME', "en-US-Journey-F")
         try:
             final_speaking_rate = float(speaking_rate) if speaking_rate is not None else float(os.getenv('TTS_DEFAULT_SPEAKING_RATE', 1.0))
             final_pitch = float(pitch) if pitch is not None else float(os.getenv('TTS_DEFAULT_PITCH', 0.0))

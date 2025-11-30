@@ -8,6 +8,7 @@ from functools import wraps
 import uuid
 import asyncio
 import json # For DUA output handling
+import docx # For native Word document support
 
 # Assuming services are initialized elsewhere and passed or imported
 # from services import AuthService, FirestoreService, StorageService, DocRetrievalService
@@ -91,9 +92,10 @@ def auth_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'docx', 'md'}
 OCR_ELIGIBLE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'tiff'}  # DEPRECATED: OCR no longer supported 
 DUA_ELIGIBLE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'} # Define file types for DUA processing (now includes images) 
+TEXT_ELIGIBLE_EXTENSIONS = {'docx', 'txt', 'md'} # Native text support extensions 
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -176,6 +178,7 @@ def upload_document():
 
             dua_processed_successfully = False
             ocr_text_content_produced = False
+            text_processed_successfully = False
 
             # --- 4. DUA PROCESSING (Single Call Refactor) ---
             if file_extension in DUA_ELIGIBLE_EXTENSIONS:
@@ -257,6 +260,81 @@ def upload_document():
                 firestore_service.update_document(document_id, final_fs_update_payload)
 
 
+            # --- 4b. NATIVE TEXT PROCESSING (New Branch) ---
+            elif file_extension in TEXT_ELIGIBLE_EXTENSIONS:
+                current_app.logger.info(f"Document {document_id} ({file_extension}) is eligible for Native Text Processing.")
+                final_fs_update_payload['status'] = 'processing_text'
+                firestore_service.update_document(document_id, {'status': 'processing_text', 'updated_at': datetime.now(timezone.utc).isoformat()})
+
+                extracted_text = ""
+                try:
+                    file.seek(0) # Reset file pointer
+                    if file_extension == 'docx':
+                        doc = docx.Document(file)
+                        extracted_text = "\n".join([para.text for para in doc.paragraphs])
+                    elif file_extension in ['txt', 'md']:
+                        extracted_text = file.read().decode('utf-8', errors='replace')
+                    
+                    if extracted_text:
+                        final_fs_update_payload['dua_narrative_content'] = extracted_text
+                        final_fs_update_payload['status'] = 'processed_dua' # Mimic DUA status for compatibility
+                        final_fs_update_payload['processing_error'] = None
+                        text_processed_successfully = True
+                        current_app.logger.info(f"Text successfully extracted for document {document_id}.")
+
+                        # --- Pre-generate TTS Audio and Timepoints (Reused Logic) ---
+                        try:
+                            if len(extracted_text.strip()) > 10:
+                                current_app.logger.info(f"Starting TTS pre-generation for text document {document_id}.")
+                                tts_service = current_app.config['TTS_SERVICE']
+                                tts_result = tts_service.synthesize_text(extracted_text)
+
+                                if tts_result and tts_result.get('audio_content') and tts_result.get('timepoints'):
+                                    audio_content = tts_result['audio_content']
+                                    timepoints_json = json.dumps(tts_result['timepoints'])
+
+                                    # Upload audio file
+                                    audio_success, audio_meta = storage_service.upload_bytes_as_file(
+                                        content_bytes=audio_content,
+                                        content_type='audio/mpeg',
+                                        user_id=user_id,
+                                        base_filename=f"{document_id}_tts.mp3",
+                                        sub_folder='tts_outputs'
+                                    )
+
+                                    # Upload timepoints file
+                                    tp_success, tp_meta = storage_service.upload_string_as_file(
+                                        content_string=timepoints_json,
+                                        content_type='application/json',
+                                        user_id=user_id,
+                                        base_filename=f"{document_id}_timepoints.json",
+                                        sub_folder='tts_outputs'
+                                    )
+
+                                    if audio_success and tp_success:
+                                        final_fs_update_payload['tts_audio_gcs_uri'] = audio_meta['gcsUri']
+                                        final_fs_update_payload['tts_timepoints_gcs_uri'] = tp_meta['gcsUri']
+                                        current_app.logger.info(f"Successfully pre-generated and saved TTS assets for {document_id}.")
+                                    else:
+                                        current_app.logger.error(f"Failed to upload TTS assets to GCS for {document_id}.")
+                                else:
+                                    current_app.logger.error(f"TTS synthesis failed or returned incomplete data for {document_id}.")
+                        except Exception as e_tts:
+                            current_app.logger.error(f"An exception occurred during TTS pre-generation for {document_id}: {e_tts}", exc_info=True)
+
+                    else:
+                         final_fs_update_payload['processing_error'] = "Extracted text was empty."
+                         final_fs_update_payload['status'] = 'processing_failed'
+
+                except Exception as e_text:
+                    current_app.logger.error(f"Error extracting text from {file_extension} file: {e_text}", exc_info=True)
+                    final_fs_update_payload['status'] = 'processing_failed'
+                    final_fs_update_payload['processing_error'] = f"Text extraction failed: {str(e_text)}"
+                
+                final_fs_update_payload['updated_at'] = datetime.now(timezone.utc).isoformat()
+                firestore_service.update_document(document_id, final_fs_update_payload)
+
+
             # --- 5. OCR PROCESSING (if not DUA processed successfully, and eligible for OCR) ---
             should_run_ocr = False
             if file_extension in OCR_ELIGIBLE_EXTENSIONS:
@@ -296,7 +374,7 @@ def upload_document():
                 "name": document_name,
                 "gcs_uri": gcs_uri,
                 "status": final_fs_update_payload.get('status'),
-                "dua_processed": dua_processed_successfully,
+                "dua_processed": dua_processed_successfully or text_processed_successfully,
                 "ocr_processed": ocr_text_content_produced,
                 "dua_narrative_snippet": (final_fs_update_payload.get('dua_narrative_content')[:200] + '...' if final_fs_update_payload.get('dua_narrative_content') else None),
                 "processing_error": final_fs_update_payload.get('processing_error')

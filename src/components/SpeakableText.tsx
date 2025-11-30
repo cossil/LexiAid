@@ -94,7 +94,7 @@ export const SpeakableText: React.FC<SpeakableTextProps> = ({
   
   return (
     <span 
-      className={className}
+      className={`relative z-10 ${className}`}
       onMouseEnter={handleTextHover}
       onMouseLeave={handleTextLeave}
       aria-label={ariaLabel || text}

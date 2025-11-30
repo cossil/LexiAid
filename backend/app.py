@@ -25,8 +25,9 @@ from flask import send_file
 import base64
 from backend.services.tts_service import TTSService, TTSServiceError
 import io
-# Construct the path to .env in the same directory as app.py
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+# Construct the path to .env in the parent directory (project root)
+basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(basedir, '.env')
 if load_dotenv(dotenv_path):
     logging.info(f"--- app.py --- Successfully loaded .env file from: {dotenv_path}")
     logging.info(f"--- app.py (after load_dotenv) --- GOOGLE_CLOUD_PROJECT_ID: {os.getenv('GOOGLE_CLOUD_PROJECT_ID')}")

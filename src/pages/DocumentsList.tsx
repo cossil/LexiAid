@@ -212,18 +212,34 @@ const DocumentsList: React.FC = () => {
           My Documents
         </h1>
         
-        <Link 
-          to="/dashboard/upload"
-          className={`flex items-center px-4 py-2 rounded-md ${
-            highContrast 
-              ? 'bg-white text-black hover:bg-gray-200' 
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          } transition-colors duration-200`}
-          onMouseEnter={() => handleHover('Upload New Document')}
-        >
-          <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
-          Upload New Document
-        </Link>
+        <div className="flex space-x-3">
+          <Link 
+            to="/dashboard/upload"
+            state={{ initialTab: 'text' }}
+            className={`flex items-center px-4 py-2 rounded-md border ${
+              highContrast 
+                ? 'border-white text-white hover:bg-gray-800' 
+                : 'border-blue-600 text-blue-400 hover:bg-blue-900/30'
+            } transition-colors duration-200`}
+            onMouseEnter={() => handleHover('Create a new document from text')}
+          >
+            <FileText className="h-4 w-4 mr-2" aria-hidden="true" />
+            Paste Text
+          </Link>
+          
+          <Link 
+            to="/dashboard/upload"
+            className={`flex items-center px-4 py-2 rounded-md ${
+              highContrast 
+                ? 'bg-white text-black hover:bg-gray-200' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            } transition-colors duration-200`}
+            onMouseEnter={() => handleHover('Upload New Document')}
+          >
+            <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
+            Upload New Document
+          </Link>
+        </div>
       </div>
 
       {/* Search and filters */}
