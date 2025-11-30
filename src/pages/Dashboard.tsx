@@ -31,7 +31,7 @@ const Dashboard: React.FC = () => {
   const { currentUser } = useAuth();
   const { speakText, uiTtsEnabled, highContrast } = useAccessibility();
   const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Function to handle TTS for interactive elements
@@ -44,7 +44,10 @@ const Dashboard: React.FC = () => {
   // Fetch user's recent documents - using backend API for consistency with DocumentsList
   useEffect(() => {
     const fetchRecentDocuments = async () => {
-      if (!currentUser) return;
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
@@ -66,7 +69,10 @@ const Dashboard: React.FC = () => {
         });
 
         // Convert the API response format to our Document interface
-        const apiDocuments = response.data.data || [];
+        // Handle both array response and {data: []} response formats
+        const responseData = response.data;
+        const apiDocuments = Array.isArray(responseData) ? responseData : (responseData?.data || []);
+        
         const documents: Document[] = apiDocuments
           .map((doc: any) => ({
             id: doc.id,
@@ -85,8 +91,9 @@ const Dashboard: React.FC = () => {
         console.log('Recent documents loaded:', documents.length);
       } catch (error) {
         console.error('Error fetching recent documents:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     
     fetchRecentDocuments();
@@ -200,6 +207,23 @@ const Dashboard: React.FC = () => {
             <Upload className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
             <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
               Upload Document
+            </span>
+          </Link>
+
+          {/* Paste Text */}
+          <Link 
+            to="/dashboard/upload" 
+            state={{ initialTab: 'text' }}
+            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
+              highContrast 
+                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+                : 'bg-gray-800/50 hover:bg-gray-700/50'
+            } transition-colors duration-200`}
+            onMouseEnter={() => handleHover('Paste Text')}
+          >
+            <FileText className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-green-400'}`} aria-hidden="true" />
+            <span className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}>
+              Paste Text
             </span>
           </Link>
           
