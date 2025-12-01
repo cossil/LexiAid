@@ -49,6 +49,8 @@ export interface UseAnswerFormulationReturn {
   editAnswer: (command: string) => Promise<void>;
   finalizeAnswer: () => void;
   reset: () => void;
+  updateManualTranscript: (text: string) => void;
+  interimTranscript: string;
 }
 
 export const useAnswerFormulation = (): UseAnswerFormulationReturn => {
@@ -93,17 +95,33 @@ export const useAnswerFormulation = (): UseAnswerFormulationReturn => {
     transcript: sttTranscript
   } = useRealtimeStt();
   
-  // Sync STT transcript to local state
-  useEffect(() => {
-    if (sttTranscript.final) {
-      setTranscript(sttTranscript.final);
-    }
-  }, [sttTranscript]);
-  
   // Auto-pause detection logic
   const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptLengthRef = useRef(0);
+  const deliveredLengthRef = useRef(0);
+
+  // Sync STT transcript to local state (Append Strategy)
+  useEffect(() => {
+    const final = sttTranscript.final;
+    
+    // If STT was reset (final is empty or shorter than delivered), reset tracker
+    if (final.length < deliveredLengthRef.current) {
+      deliveredLengthRef.current = 0;
+    }
+
+    // If we have new content
+    if (final.length > deliveredLengthRef.current) {
+      const newPart = final.slice(deliveredLengthRef.current);
+      deliveredLengthRef.current = final.length;
+      
+      setTranscript(prev => {
+        // Add space if needed
+        const separator = prev && !prev.endsWith(' ') && !newPart.startsWith(' ') ? ' ' : '';
+        return prev + separator + newPart;
+      });
+    }
+  }, [sttTranscript.final]);
   
   useEffect(() => {
     // Only run auto-pause logic when recording and auto-pause is enabled
@@ -179,6 +197,7 @@ export const useAnswerFormulation = (): UseAnswerFormulationReturn => {
       setStatus('recording');
       setError(null);
       lastTranscriptLengthRef.current = 0;
+      deliveredLengthRef.current = 0;
       await startSTT();
     } catch (err) {
       console.error('Failed to start dictation:', err);
@@ -315,6 +334,7 @@ export const useAnswerFormulation = (): UseAnswerFormulationReturn => {
     setIterationCount(0);
     setError(null);
     setPauseCountdown(null);
+    deliveredLengthRef.current = 0;
     
     // Clear any active timers
     if (pauseTimerRef.current) {
@@ -356,6 +376,8 @@ export const useAnswerFormulation = (): UseAnswerFormulationReturn => {
     editAnswer,
     finalizeAnswer,
     reset,
+    updateManualTranscript: setTranscript,
+    interimTranscript: sttTranscript.interim,
   };
 };
 

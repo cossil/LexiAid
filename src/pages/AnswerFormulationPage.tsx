@@ -56,6 +56,8 @@ const AnswerFormulationPage: React.FC = () => {
     editAnswer,
     finalizeAnswer,
     reset,
+    updateManualTranscript,
+    interimTranscript,
   } = useAnswerFormulation();
 
   // Local UI state
@@ -271,9 +273,11 @@ const AnswerFormulationPage: React.FC = () => {
             {(status === 'idle' || status === 'recording') && (
               <DictationPanel
                 transcript={transcript}
+                interimTranscript={interimTranscript}
                 isRecording={status === 'recording'}
                 onStart={startDictation}
                 onStop={stopDictation}
+                onTranscriptChange={updateManualTranscript}
                 onSettingsClick={() => setShowSettings(true)}
                 autoPauseEnabled={autoPauseEnabled}
                 pauseCountdown={pauseCountdown}

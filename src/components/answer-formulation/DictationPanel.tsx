@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Mic, Square, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { useTTSPlayer } from '../../hooks/useTTSPlayer';
 import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { HighlightedTextBlock } from '../shared/HighlightedTextBlock';
@@ -17,6 +17,7 @@ interface DictationPanelProps {
   isRecording: boolean;
   onStart: () => void;
   onStop: () => void;
+  onTranscriptChange: (text: string) => void;
   onSettingsClick?: () => void;
   autoPauseEnabled?: boolean;
   pauseCountdown?: number | null;
@@ -29,13 +30,13 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
   isRecording,
   onStart,
   onStop,
+  onTranscriptChange,
   onSettingsClick,
   autoPauseEnabled = false,
   pauseCountdown = null,
   disabled = false,
 }) => {
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const wordCount = transcript.split(/\s+/).filter(word => word.length > 0).length;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { speakText, uiTtsEnabled } = useAccessibility();
 
   const handleHover = (text: string) => {
@@ -54,20 +55,22 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
     seekAndPlay,
   } = useTTSPlayer(null);
 
-  // Auto-scroll to bottom when transcript updates
+  const isReading = ttsStatus === 'playing' || ttsStatus === 'loading' || ttsStatus === 'paused';
+
+  // Auto-scroll textarea to bottom when transcript updates and user is not manually editing (roughly)
   useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    if (textareaRef.current && isRecording) {
+       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
-  }, [transcript, interimTranscript]);
+  }, [transcript, isRecording]);
   
   // TTS click handler
-  const handlePlayTranscript = () => {
+  const handleReadAloud = () => {
     if (!transcript.trim()) {
       return;
     }
 
-    if (ttsStatus === 'playing' || ttsStatus === 'loading') {
+    if (isReading) {
       stopAudio();
     } else {
       playAudio({ text: transcript });
@@ -75,199 +78,170 @@ const DictationPanel: React.FC<DictationPanelProps> = ({
   };
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm border-2 border-gray-200 p-6">
+    <div className="w-full bg-white rounded-lg shadow-sm border-2 border-gray-200 p-6 transition-all duration-300">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-blue-600'}`} />
-          <h2 
-            className="text-xl font-semibold text-gray-800"
-            onMouseEnter={() => handleHover(isRecording ? 'Listening...' : 'Speak Your Thoughts')}
-          >
-            {isRecording ? 'Listening...' : 'Speak Your Thoughts'}
-          </h2>
-          {isRecording && (
-            <span className="text-sm text-gray-600">({wordCount} words)</span>
-          )}
+            <h2 
+                className="text-xl font-semibold text-gray-800"
+                onMouseEnter={() => handleHover('Draft Answer')}
+            >
+                Draft Answer
+            </h2>
         </div>
         
-        {/* Auto-pause indicator */}
+        {/* Auto-pause indicator (Compact) */}
         {isRecording && autoPauseEnabled && pauseCountdown === null && (
           <div 
-            className="flex items-center gap-2 text-sm text-gray-600"
-            onMouseEnter={() => handleHover('Auto-pause enabled')}
+            className="flex items-center gap-2 text-sm text-gray-500"
+            onMouseEnter={() => handleHover('Auto-pause active')}
           >
-            <span>⏱️</span>
-            <span>Auto-pause enabled</span>
+            <span>⏱️ Auto-pause active</span>
           </div>
         )}
       </div>
 
-      {/* Main content area */}
-      <div className="min-h-[300px] flex flex-col items-center justify-center gap-4 p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
-        {!isRecording && !transcript ? (
-          // Idle state
-          <>
-            <button
-              onClick={onStart}
-              disabled={disabled}
-              className="w-32 h-32 rounded-full bg-green-500 hover:bg-green-600 
-                       flex items-center justify-center
-                       shadow-lg hover:shadow-xl
-                       transition-all duration-200
-                       disabled:bg-gray-400 disabled:cursor-not-allowed
-                       focus:outline-none focus:ring-4 focus:ring-green-300"
-              aria-label="Start Dictating"
+      {/* Input Area */}
+      <div className="relative mb-4">
+        {isReading ? (
+            <div 
+            className="min-h-[200px] max-h-[400px] w-full rounded-lg border border-blue-200 bg-blue-50 p-4 overflow-y-auto"
+            aria-live="polite"
             >
-              <Mic className="w-16 h-16 text-white" />
-            </button>
-            <p 
-              className="text-lg font-medium text-gray-700"
-              onMouseEnter={() => handleHover('Start Dictating')}
-            >
-              Start Dictating
-            </p>
-            <p 
-              className="text-sm text-gray-500 text-center max-w-md"
-              onMouseEnter={() => handleHover('Speak freely. Don\'t worry about organization.')}
-            >
-              Speak freely. Don't worry about organization.
-            </p>
-          </>
-        ) : (
-          // Recording or has transcript
-          <>
-            {isRecording && (
-              <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
-                <Mic className="w-12 h-12 text-white" />
-              </div>
-            )}
-            
-            {/* Transcript display */}
-            <div className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <span 
-                  className="text-sm font-medium text-gray-700"
-                  onMouseEnter={() => handleHover('Transcript')}
-                >
-                  Transcript
-                </span>
-                
-                {/* TTS Speaker Button */}
-                {transcript && (
-                  <button
-                    onClick={handlePlayTranscript}
-                    disabled={!transcript.trim() || isRecording}
-                    className="p-2 rounded-full hover:bg-gray-100 
-                               disabled:opacity-40 disabled:cursor-not-allowed
-                               transition-colors duration-200
-                               focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    title={ttsStatus === 'playing' ? "Stop reading transcript" : "Listen to transcript"}
-                    aria-label={ttsStatus === 'playing' ? "Stop audio" : "Play transcript audio"}
-                  >
-                    {ttsStatus === 'loading' ? (
-                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                    ) : ttsStatus === 'playing' ? (
-                      <VolumeX className="w-4 h-4 text-blue-600" />
-                    ) : (
-                      <Volume2 className="w-4 h-4 text-blue-600" />
-                    )}
-                  </button>
-                )}
-              </div>
-              
-              <div
-                ref={transcriptRef}
-                className="w-full min-h-[200px] max-h-[400px] overflow-y-auto p-4 bg-white rounded-md border border-gray-300"
-                role="log"
-                aria-live="polite"
-                aria-label="Transcript"
-              >
-                {transcript && (
-                  <HighlightedTextBlock
-                    text={transcript}
-                    wordTimepoints={wordTimepoints}
-                    activeTimepoint={activeTimepoint}
-                    onWordClick={(time) => seekAndPlay(time)}
-                    className="text-lg"
-                  />
-                )}
-                {interimTranscript && (
-                  <p className="text-base text-gray-500 italic whitespace-pre-wrap" style={{ fontFamily: 'OpenDyslexic, sans-serif' }}>
-                    {interimTranscript}
-                  </p>
-                )}
-                {!transcript && !interimTranscript && (
-                  <p 
-                    className="text-gray-400 italic"
-                    onMouseEnter={() => handleHover('Your speech will appear here...')}
-                  >
-                    Your speech will appear here...
-                  </p>
-                )}
-              </div>
+            <HighlightedTextBlock
+                text={transcript}
+                wordTimepoints={wordTimepoints}
+                activeTimepoint={activeTimepoint}
+                onWordClick={seekAndPlay}
+                className="text-lg text-gray-800"
+            />
             </div>
-
-            {/* Auto-pause countdown */}
-            {pauseCountdown !== null && pauseCountdown > 0 && (
-              <div className="w-full p-4 bg-yellow-50 border-2 border-yellow-300 rounded-md">
-                <div className="flex items-center justify-between mb-2">
-                  <span 
-                    className="text-sm font-medium text-yellow-800"
-                    onMouseEnter={() => handleHover(`Pause detected: Auto-stopping in ${pauseCountdown.toFixed(1)} seconds`)}
-                  >
-                    Pause detected: Auto-stopping in {pauseCountdown.toFixed(1)}s
-                  </span>
-                </div>
-                <div className="w-full bg-yellow-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-yellow-600 h-full transition-all duration-100"
-                    style={{ width: `${(pauseCountdown / 3) * 100}%` }}
-                  />
-                </div>
-                <p 
-                  className="text-xs text-yellow-700 mt-1"
-                  onMouseEnter={() => handleHover('Resume speaking to cancel')}
-                >
-                  (Resume speaking to cancel)
-                </p>
-              </div>
-            )}
-          </>
+        ) : (
+            <div className="relative">
+                <textarea
+                    ref={textareaRef}
+                    className="w-full min-h-[200px] max-h-[400px] p-4 text-lg text-gray-800 bg-white rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-y transition-all"
+                    placeholder="Start typing or press the microphone to dictate..."
+                    value={transcript}
+                    onChange={(e) => onTranscriptChange(e.target.value)}
+                    disabled={disabled}
+                    onMouseEnter={() => handleHover('Type or dictate your answer here')}
+                />
+            </div>
+        )}
+        
+        {/* Interim text (Ghost text) */}
+        {!isReading && interimTranscript && (
+            <div className="mt-2 p-2 text-gray-500 italic bg-gray-50 rounded border border-gray-100 animate-pulse">
+                <span className="font-semibold text-xs uppercase tracking-wider text-gray-400 mr-2">Hearing:</span>
+                {interimTranscript}
+            </div>
         )}
       </div>
 
-      {/* Action buttons */}
-      {isRecording && (
-        <div className="mt-4 flex items-center justify-center gap-4">
-          <button
-            onClick={onStop}
-            className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg
-                     shadow-md hover:shadow-lg
-                     transition-all duration-200
-                     focus:outline-none focus:ring-4 focus:ring-red-300
-                     flex items-center gap-2"
-            aria-label="Stop Dictating"
-          >
-            <Square className="w-5 h-5" />
-            Stop {pauseCountdown !== null ? 'Now' : 'Dictating'}
-          </button>
-          
-          {onSettingsClick && (
-            <button
-              onClick={onSettingsClick}
-              className="px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg
-                       transition-all duration-200
-                       focus:outline-none focus:ring-4 focus:ring-gray-300
-                       flex items-center gap-2"
-              aria-label="Dictation Settings"
+      {/* Auto-pause countdown (Prominent when active) */}
+      {pauseCountdown !== null && pauseCountdown > 0 && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3 animate-pulse">
+            <span className="text-xl">⏱️</span>
+            <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-800">
+                    Pause detected. Stopping in {pauseCountdown.toFixed(1)}s...
+                </p>
+                <div className="w-full bg-yellow-200 rounded-full h-1.5 mt-1">
+                    <div
+                    className="bg-yellow-600 h-full transition-all duration-100"
+                    style={{ width: `${(pauseCountdown / 3) * 100}%` }}
+                    />
+                </div>
+            </div>
+            <button 
+                onClick={onStart}
+                className="text-xs font-semibold text-yellow-700 underline"
             >
-              <Settings className="w-5 h-5" />
-              Settings
+                Resume Speaking
             </button>
-          )}
         </div>
       )}
+
+      {/* Control Bar */}
+      <div className="flex items-center justify-between gap-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+        
+        {/* Main Actions */}
+        <div className="flex items-center gap-3">
+            {/* Record Button */}
+            <button
+                onClick={isRecording ? onStop : onStart}
+                disabled={disabled || isReading}
+                className={`
+                    relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold shadow-sm transition-all
+                    ${isRecording 
+                        ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 border border-transparent'
+                    }
+                    ${(disabled || isReading) ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title={isRecording ? "Stop Dictation" : "Start Dictation"}
+            >
+                {isRecording ? (
+                    <>
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        </span>
+                        Stop
+                    </>
+                ) : (
+                    <>
+                        <Mic className="w-5 h-5" />
+                        Dictate
+                    </>
+                )}
+            </button>
+
+            {/* Read Aloud Button */}
+            <button
+                onClick={handleReadAloud}
+                disabled={!transcript.trim() || isRecording}
+                className={`
+                    flex items-center justify-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all
+                    ${isReading 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    }
+                    ${(!transcript.trim() || isRecording) ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title={isReading ? "Stop Reading" : "Read Aloud"}
+            >
+                {ttsStatus === 'loading' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isReading ? (
+                    <VolumeX className="w-5 h-5" />
+                ) : (
+                    <Volume2 className="w-5 h-5" />
+                )}
+                <span className="hidden sm:inline">{isReading ? 'Stop' : 'Read Aloud'}</span>
+            </button>
+        </div>
+
+        {/* Secondary Actions */}
+        <div className="flex items-center gap-2">
+             {/* Word Count (Subtle) */}
+             <span className="text-xs text-gray-400 hidden sm:inline-block mr-2">
+                {transcript.split(/\s+/).filter(w => w.length > 0).length} words
+            </span>
+
+            {onSettingsClick && (
+                <button
+                    onClick={onSettingsClick}
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full transition-colors"
+                    title="Dictation Settings"
+                >
+                    <Settings className="w-5 h-5" />
+                </button>
+            )}
+        </div>
+
+      </div>
     </div>
   );
 };
