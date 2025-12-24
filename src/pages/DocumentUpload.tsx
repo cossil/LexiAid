@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAccessibility } from '../contexts/AccessibilityContext';
-import axios from 'axios';
+import { apiService } from '../services/api';
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -162,47 +162,36 @@ const DocumentUpload: React.FC = () => {
       return;
     }
 
+    if (!currentUser) {
+      setError('You must be logged in to upload documents');
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
     setError('');
 
-    const formData = new FormData();
-    formData.append('file', fileToUpload);
-    formData.append('name', documentName);
-
     try {
-      // Determine API URL from environment variable or default
-      const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8081'; 
-      const url = `${apiUrl}/api/documents/upload`; // Ensure '/upload' is present
-
-      console.log('Attempting to POST to URL:', url); // Debugging line
-
-      // Get user's Firebase ID token
-      const token = await currentUser?.getIdToken();
+      // Create a new file with the document name to pass metadata
+      const renamedFile = new File([fileToUpload], fileToUpload.name, { type: fileToUpload.type });
       
-      if (!token) {
-        throw new Error('Authentication token not available');
-      }
-
-      const response = await axios.post(url, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
-        },
-        onUploadProgress: (progressEvent) => {
+      const response = await apiService.uploadDocument(
+        renamedFile,
+        { name: documentName },
+        (progressEvent) => {
           const progress = Math.round(
             (progressEvent.loaded * 100) / (progressEvent.total || 100)
           );
           setUploadProgress(progress);
         }
-      });
+      );
 
       // Handle success
       setUploadSuccess(true);
       
       // Navigate to document detail page after 1.5 seconds
       setTimeout(() => {
-        navigate(`/dashboard/documents/${response.data.document.id}`);
+        navigate(`/dashboard/documents/${response.document_id}`);
       }, 1500);
       
     } catch (error) {

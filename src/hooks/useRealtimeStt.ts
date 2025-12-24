@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import useAudioRecorder from './useAudioRecorder';
 
 export type SttStatus = 'idle' | 'requesting_permission' | 'dictating' | 'review' | 'connecting';
@@ -28,6 +28,32 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   const wsRef = useRef<WebSocket | null>(null);
   const manualStopRef = useRef<boolean>(false);
   const { startRecording, stopRecording, isRecording } = useAudioRecorder();
+  
+  // Track active state via ref to avoid stale closures in cleanup
+  const isRecordingRef = useRef(isRecording);
+  isRecordingRef.current = isRecording;
+  
+  // Cleanup on unmount to prevent memory leaks and locked microphone
+  useEffect(() => {
+    return () => {
+      // Close WebSocket if still connected
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+          console.log('WebSocket closed on unmount');
+        } catch (e) {
+          console.warn('Error closing WebSocket on unmount:', e);
+        }
+        wsRef.current = null;
+      }
+      
+      // Stop recording if active (useAudioRecorder handles track cleanup)
+      if (isRecordingRef.current) {
+        stopRecording();
+        console.log('Recording stopped on unmount');
+      }
+    };
+  }, [stopRecording]);
 
   const resolveBackendOrigin = () => {
     const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';

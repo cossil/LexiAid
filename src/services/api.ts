@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosProgressEvent } from 'axios';
 import { auth } from '../firebase/config'; // Import auth directly
 import type {
   AdminStatsResponse,
@@ -212,14 +212,21 @@ export const apiService = {
   },
   
   // Upload document
-  async uploadDocument(file: File, metadata?: Record<string, any>): Promise<{
-    id: string;
+  async uploadDocument(
+    file: File, 
+    metadata?: Record<string, any>,
+    onUploadProgress?: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<{
+    document_id: string;
+    message: string;
+    filename: string;
     name: string;
-    created_at: string;
-    updated_at: string;
-    file_type: string;
-    original_filename: string;
-    content_length: number;
+    gcs_uri: string;
+    status: string;
+    dua_processed: boolean;
+    ocr_processed: boolean;
+    dua_narrative_snippet: string | null;
+    processing_error: string | null;
   }> {
     const formData = new FormData();
     formData.append('file', file);
@@ -228,10 +235,11 @@ export const apiService = {
       formData.append('metadata', JSON.stringify(metadata));
     }
     
-    const response = await api.post('/api/documents', formData, {
+    const response = await api.post('/api/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      onUploadProgress,
     });
     
     return response.data;
