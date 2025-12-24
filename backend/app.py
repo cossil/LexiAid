@@ -62,7 +62,7 @@ import firebase_admin
 
 # Use absolute imports from backend package
 from backend.services import (AuthService, FirestoreService, StorageService, 
-                      DocAIService, DocumentRetrievalService, TTSService, STTService)
+                      DocumentRetrievalService, TTSService, STTService)
 # Note: AiTutorAgent (ReAct-based) was previously imported here but is no longer used by the application.
 # The LangGraph-based Supervisor architecture (supervisor_graph.py) now handles all agent functionality.
 # Kept for reference or potential future use. Can be removed if not needed.
@@ -82,41 +82,8 @@ from backend.utils.message_utils import serialize_messages, deserialize_messages
 from functools import wraps # Added for auth decorator
 
 # --- Authentication Decorator --- 
-def require_auth(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Authorization header is missing or invalid", "code": "UNAUTHENTICATED"}), 401
-        
-        token = auth_header.split('Bearer ')[1]
-        auth_service = current_app.config.get('AUTH_SERVICE')
-        if not auth_service:
-            current_app.logger.error("ERROR: Authentication service not available in app config")
-            return jsonify({"error": "Authentication service not available", "code": "AUTH_SERVICE_UNAVAILABLE"}), 500
-
-        try:
-            success, token_data = auth_service.verify_id_token(token)
-            
-            if not success or not token_data:
-                current_app.logger.debug(f"DEBUG: AuthService.verify_id_token returned success={success}, token_data present={token_data is not None}")
-                return jsonify({"error": "Invalid or expired token", "details": "Token verification failed by auth service.", "code": "INVALID_TOKEN_AUTH_SERVICE"}), 401
-
-            user_id = token_data.get('uid')
-            
-            if not user_id:
-                current_app.logger.error(f"ERROR: User ID ('uid') not found in verified token data: {token_data}")
-                return jsonify({"error": "User ID not found in token claims", "code": "USER_ID_NOT_IN_TOKEN_CLAIMS"}), 401
-            
-            g.user_id = user_id
-            g.user_email = token_data.get('email')
-        except Exception as e:
-            current_app.logger.error(f"ERROR: Unexpected issue during token verification process: {e}")
-            traceback.print_exc()
-            return jsonify({"error": "Token verification process failed unexpectedly", "details": str(e), "code": "VERIFICATION_PROCESS_ERROR"}), 401
-        
-        return f(*args, **kwargs)
-    return decorated_function
+# Import from centralized decorators module to avoid circular imports
+from backend.decorators.auth import require_auth
 
 # Import Blueprints using absolute paths
 from backend.routes.document_routes import document_bp
@@ -126,6 +93,7 @@ from backend.routes.user_routes import user_bp
 from backend.routes.progress_routes import progress_bp
 from backend.routes.answer_formulation_routes import answer_formulation_bp
 from backend.routes.feedback_routes import feedback_bp
+from backend.routes.admin_routes import admin_bp
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -159,7 +127,7 @@ with app.app_context():
 
     # Activate optional LangGraph diagnostics patch (for debugging)
     try:
-        import backend.diagnostics.langgraph_patch  # noqa
+        import backend.utils.langgraph_serialization  # noqa
         logging.info("LangGraph diagnostics patch activated")
         app.logger.info("[LangGraph Patch] Deep serialization & SqliteSaver monkeypatch ACTIVE")
     except Exception as e:
@@ -175,9 +143,6 @@ with app.app_context():
     storage_service = initialize_component(StorageService, 'StorageService', 'SERVICES')
     if storage_service:
         app.config['STORAGE_SERVICE'] = storage_service
-    docai_service = initialize_component(DocAIService, 'DocAIService', 'SERVICES')
-    if docai_service:
-        app.config['DOCAI_SERVICE'] = docai_service
     tts_service = initialize_component(TTSService, 'TTSService', 'SERVICES')
     if tts_service:
         app.config['TTS_SERVICE'] = tts_service
@@ -208,6 +173,7 @@ app.register_blueprint(user_bp, url_prefix='/api/users')
 app.register_blueprint(progress_bp, url_prefix='/api/progress')
 app.register_blueprint(answer_formulation_bp, url_prefix='/api/v2/answer-formulation')
 app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
+app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
 # Safe Supervisor Invoke Wrapper
 def safe_supervisor_invoke(compiled_supervisor_graph, supervisor_input, config=None):

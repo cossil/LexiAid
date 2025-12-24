@@ -190,12 +190,14 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('UI Text-to-Speech')}
+                onClick={() => handleHover('UI Text-to-Speech')}
               >
                 UI Text-to-Speech
               </h3>
               <p 
                 className="text-sm text-gray-400 mb-2"
                 onMouseEnter={() => handleHover('Enable or disable text-to-speech for UI elements when you hover over them')}
+                onClick={() => handleHover('Enable or disable text-to-speech for UI elements when you hover over them')}
               >
                 Enable or disable text-to-speech for UI elements when you hover over them
               </p>
@@ -224,6 +226,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Text-to-Speech Delay')}
+                onClick={() => handleHover('Text-to-Speech Delay')}
               >
                 <div className="flex items-center">
                   <Clock className="w-5 h-5 mr-2" />
@@ -233,6 +236,7 @@ const Settings: React.FC = () => {
               <p 
                 className="text-sm text-gray-400 mb-2"
                 onMouseEnter={() => handleHover('Set how long to wait before speaking text when you hover over an element')}
+                onClick={() => handleHover('Set how long to wait before speaking text when you hover over an element')}
               >
                 Set how long to wait before speaking text when you hover over an element. 
                 This helps prevent overlapping speech when moving quickly across the page.
@@ -255,12 +259,14 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('High Contrast Mode')}
+                onClick={() => handleHover('High Contrast Mode')}
               >
                 High Contrast Mode
               </h3>
               <p 
                 className="text-sm text-gray-400 mb-2"
                 onMouseEnter={() => handleHover('Enable or disable high contrast display for better visibility')}
+                onClick={() => handleHover('Enable or disable high contrast display for better visibility')}
               >
                 Enable or disable high contrast display for better visibility
               </p>
@@ -285,12 +291,14 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Premium Text-to-Speech')}
+                onClick={() => handleHover('Premium Text-to-Speech')}
               >
                 Premium Text-to-Speech
               </h3>
               <p 
                 className="text-sm text-gray-400 mb-2"
                 onMouseEnter={() => handleHover('Use high-quality cloud text-to-speech for document reading')}
+                onClick={() => handleHover('Use high-quality cloud text-to-speech for document reading')}
               >
                 Use high-quality cloud text-to-speech for document reading (not for UI elements)
               </p>
@@ -332,6 +340,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Font Size')}
+                onClick={() => handleHover('Font Size')}
               >
                 Font Size
               </h3>
@@ -353,6 +362,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Line Spacing')}
+                onClick={() => handleHover('Line Spacing')}
               >
                 Line Spacing
               </h3>
@@ -374,6 +384,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Word Spacing')}
+                onClick={() => handleHover('Word Spacing')}
               >
                 Word Spacing
               </h3>
@@ -395,6 +406,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Font Family')}
+                onClick={() => handleHover('Font Family')}
               >
                 Font Family
               </h3>
@@ -440,6 +452,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium"
                 onMouseEnter={() => handleHover('Profile Information')}
+                onClick={() => handleHover('Profile Information')}
               >
                 Profile Information
               </h3>
@@ -480,6 +493,7 @@ const Settings: React.FC = () => {
               <h3 
                 className="text-md font-medium mb-4"
                 onMouseEnter={() => handleHover('Email Status')}
+                onClick={() => handleHover('Email Status')}
               >
                 Email Status
               </h3>
@@ -539,6 +553,7 @@ const Settings: React.FC = () => {
                 <h3 
                     className="text-md font-medium text-red-500 flex items-center mb-2"
                     onMouseEnter={() => handleHover('Danger Zone')}
+                    onClick={() => handleHover('Danger Zone')}
                 >
                     <Trash2 className="w-5 h-5 mr-2" />
                     Danger Zone

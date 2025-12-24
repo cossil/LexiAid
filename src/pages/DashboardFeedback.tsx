@@ -142,18 +142,21 @@ const DashboardFeedback: React.FC = () => {
         <p 
           className="text-sm uppercase tracking-[0.3em] text-blue-400"
           onMouseEnter={() => handleHover('Voice-friendly feedback')}
+          onClick={() => handleHover('Voice-friendly feedback')}
         >
           Voice-friendly feedback
         </p>
         <h1 
           className="mt-2 text-4xl font-semibold text-white"
           onMouseEnter={() => handleHover('Send Feedback')}
+          onClick={() => handleHover('Send Feedback')}
         >
           Send Feedback
         </h1>
         <p 
           className="mt-3 max-w-2xl text-lg text-gray-300"
           onMouseEnter={() => handleHover('Dictate or type accessibility issues, bugs, or suggestions. We review every submission directly from Firebase Console.')}
+          onClick={() => handleHover('Dictate or type accessibility issues, bugs, or suggestions. We review every submission directly from Firebase Console.')}
         >
           Dictate or type accessibility issues, bugs, or suggestions. We review every submission directly from Firebase Console.
         </p>
@@ -165,6 +168,7 @@ const DashboardFeedback: React.FC = () => {
             <span 
               className="text-sm font-medium text-gray-300"
               onMouseEnter={() => handleHover('Feedback Type')}
+              onClick={() => handleHover('Feedback Type')}
             >
               Feedback Type
             </span>
@@ -186,12 +190,14 @@ const DashboardFeedback: React.FC = () => {
             <span 
               className="text-sm font-medium text-gray-300"
               onMouseEnter={() => handleHover('Browser Details')}
+              onClick={() => handleHover('Browser Details')}
             >
               Browser Details
             </span>
             <p 
               className="rounded-xl border border-gray-700 bg-gray-900/60 px-4 py-3 text-sm text-gray-400"
               onMouseEnter={() => handleHover(browserInfo || 'Collecting browser info…')}
+              onClick={() => handleHover(browserInfo || 'Collecting browser info…')}
             >
               {browserInfo || 'Collecting browser info…'}
             </p>
@@ -205,12 +211,14 @@ const DashboardFeedback: React.FC = () => {
                   htmlFor="feedback-description" 
                   className="text-sm font-medium text-gray-300"
                   onMouseEnter={() => handleHover('Description')}
+                  onClick={() => handleHover('Description')}
                 >
                   Description
                 </label>
                 <p 
                   className="text-sm text-gray-500"
                   onMouseEnter={() => handleHover('Explain what happened, what you expected, and any assistive tech involved.')}
+                  onClick={() => handleHover('Explain what happened, what you expected, and any assistive tech involved.')}
                 >
                   Explain what happened, what you expected, and any assistive tech involved.
                 </p>
@@ -301,6 +309,7 @@ const DashboardFeedback: React.FC = () => {
           <span 
             className="text-xs text-gray-500"
             onMouseEnter={() => handleHover('Submissions are private to the LexiAid team and reviewed weekly.')}
+            onClick={() => handleHover('Submissions are private to the LexiAid team and reviewed weekly.')}
           >
             Submissions are private to the LexiAid team and reviewed weekly.
           </span>

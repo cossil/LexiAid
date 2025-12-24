@@ -174,11 +174,13 @@ const Dashboard: React.FC = () => {
       <div className={`mb-8 ${highContrast ? 'border-b border-white pb-6' : 'pb-6'}`}>
         <h1 className={`text-3xl font-bold ${highContrast ? 'text-white' : 'text-white'} mb-2`}
           onMouseEnter={() => handleHover(`Welcome back, ${userProfile?.displayName || 'Student'}`)}
+          onClick={() => handleHover(`Welcome back, ${userProfile?.displayName || 'Student'}`)}
         >
           Welcome back, {userProfile?.displayName || currentUser?.displayName || 'Student'}
         </h1>
         <p className={`${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
           onMouseEnter={() => handleHover('Continue your learning journey with LexiAid')}
+          onClick={() => handleHover('Continue your learning journey with LexiAid')}
         >
           Continue your learning journey with LexiAid
         </p>
@@ -190,6 +192,7 @@ const Dashboard: React.FC = () => {
           id="quick-actions-heading" 
           className={`text-xl font-semibold mb-4 ${highContrast ? 'text-white' : 'text-white'}`}
           onMouseEnter={() => handleHover('Quick Actions')}
+          onClick={() => handleHover('Quick Actions')}
         >
           Quick Actions
         </h2>
@@ -253,6 +256,7 @@ const Dashboard: React.FC = () => {
             id="recent-documents-heading" 
             className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-white'}`}
             onMouseEnter={() => handleHover('Recent Documents')}
+            onClick={() => handleHover('Recent Documents')}
           >
             Recent Documents
           </h2>
@@ -359,6 +363,7 @@ const Dashboard: React.FC = () => {
             <p 
               className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}
               onMouseEnter={() => handleHover('You haven\'t uploaded any documents yet.')}
+              onClick={() => handleHover('You haven\'t uploaded any documents yet.')}
             >
               You haven't uploaded any documents yet.
             </p>

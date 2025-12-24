@@ -23,6 +23,7 @@ import { Toaster } from 'react-hot-toast';
 import About from './pages/public/About';
 import Privacy from './pages/public/Privacy';
 import Terms from './pages/public/Terms';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 // Developer-only import - lazy loaded and excluded from production builds
 const DeprecationShowcase = import.meta.env.DEV 
@@ -177,6 +178,9 @@ const AppRoutes = () => {
         
         {/* Settings route */}
         <Route path="settings" element={<Settings />} />
+        
+        {/* Admin Console route */}
+        <Route path="admin" element={<AdminDashboard />} />
         
         {/* Fallback for dashboard routes */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

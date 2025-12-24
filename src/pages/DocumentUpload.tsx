@@ -229,6 +229,7 @@ const DocumentUpload: React.FC = () => {
       <h1 
         className={`text-3xl font-bold mb-6 ${highContrast ? 'text-white' : 'text-white'}`}
         onMouseEnter={() => handleHover('Upload Document')}
+        onClick={() => handleHover('Upload Document')}
       >
         Upload Document
       </h1>
@@ -240,20 +241,33 @@ const DocumentUpload: React.FC = () => {
             <h2 
               className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'} mb-2`}
               onMouseEnter={() => handleHover('Document Processing with LexiAid')}
+              onClick={() => handleHover('Document Processing with LexiAid')}
             >
               Document Processing with LexiAid
             </h2>
             <ul className={`list-disc list-inside space-y-1 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}>
-              <li onMouseEnter={() => handleHover('Upload any document: PDF, image with text, Word document, or text file')}>
+              <li 
+                onMouseEnter={() => handleHover('Upload any document: PDF, image with text, Word document, or text file')}
+                onClick={() => handleHover('Upload any document: PDF, image with text, Word document, or text file')}
+              >
                 Upload any document: PDF, image with text, Word document, or text file
               </li>
-              <li onMouseEnter={() => handleHover('LexiAid will process the text content, making it accessible for your learning')}>
+              <li 
+                onMouseEnter={() => handleHover('LexiAid will process the text content, making it accessible for your learning')}
+                onClick={() => handleHover('LexiAid will process the text content, making it accessible for your learning')}
+              >
                 LexiAid will process the text content, making it accessible for your learning
               </li>
-              <li onMouseEnter={() => handleHover('Once processed, you can read, get summaries, and ask questions about the material')}>
+              <li 
+                onMouseEnter={() => handleHover('Once processed, you can read, get summaries, and ask questions about the material')}
+                onClick={() => handleHover('Once processed, you can read, get summaries, and ask questions about the material')}
+              >
                 Once processed, you can read, get summaries, and ask questions about the material
               </li>
-              <li onMouseEnter={() => handleHover('Maximum file size: 15MB')}>
+              <li 
+                onMouseEnter={() => handleHover('Maximum file size: 15MB')}
+                onClick={() => handleHover('Maximum file size: 15MB')}
+              >
                 Maximum file size: 15MB
               </li>
             </ul>
@@ -343,18 +357,21 @@ const DocumentUpload: React.FC = () => {
                   <h3 
                     className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
                     onMouseEnter={() => handleHover('Drag and drop your file here')}
+                    onClick={() => handleHover('Drag and drop your file here')}
                   >
                     Drag and drop your file here
                   </h3>
                   <p 
                     className={`${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
                     onMouseEnter={() => handleHover('or browse to upload')}
+                    onClick={() => handleHover('or browse to upload')}
                   >
                     or <span className={`${highContrast ? 'text-white underline' : 'text-blue-400'}`}>browse</span> to upload
                   </p>
                   <p 
                     className={`text-sm ${highContrast ? 'text-gray-400' : 'text-gray-500'}`}
                     onMouseEnter={() => handleHover('Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX')}
+                    onClick={() => handleHover('Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX')}
                   >
                     Supported formats: PDF, PNG, JPG, TXT, DOC, DOCX
                   </p>
@@ -377,12 +394,14 @@ const DocumentUpload: React.FC = () => {
                   <h3 
                     className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'}`}
                     onMouseEnter={() => handleHover(files[0].name)}
+                    onClick={() => handleHover(files[0].name)}
                   >
                     {files[0].name}
                   </h3>
                   <p 
                     className={`text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
                     onMouseEnter={() => handleHover(`${MIME_TYPE_NAMES[files[0].type] || 'Document'} • ${(files[0].size / 1024 / 1024).toFixed(2)} megabytes`)}
+                    onClick={() => handleHover(`${MIME_TYPE_NAMES[files[0].type] || 'Document'} • ${(files[0].size / 1024 / 1024).toFixed(2)} megabytes`)}
                   >
                     {MIME_TYPE_NAMES[files[0].type] || 'Document'} • {(files[0].size / 1024 / 1024).toFixed(2)} MB
                   </p>
@@ -423,6 +442,7 @@ const DocumentUpload: React.FC = () => {
               <p 
                 className={`mt-2 text-sm text-right ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
                 onMouseEnter={() => handleHover(`${pastedText.length} characters`)}
+                onClick={() => handleHover(`${pastedText.length} characters`)}
               >
                 {pastedText.length} characters
               </p>
@@ -435,6 +455,7 @@ const DocumentUpload: React.FC = () => {
               htmlFor="document-name" 
               className={`block text-sm font-medium mb-2 ${highContrast ? 'text-white' : 'text-gray-300'}`}
               onMouseEnter={() => handleHover('Document Name')}
+              onClick={() => handleHover('Document Name')}
             >
               Document Name
             </label>
@@ -456,6 +477,7 @@ const DocumentUpload: React.FC = () => {
             <p 
               className={`mt-1 text-sm ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}
               onMouseEnter={() => handleHover('This name will help you identify the document later')}
+              onClick={() => handleHover('This name will help you identify the document later')}
             >
               This name will help you identify the document later
             </p>

@@ -42,18 +42,21 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h1 
         className="text-3xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('Welcome to Answer Formulation!')}
+        onClick={() => handleHover('Welcome to Answer Formulation!')}
       >
         Welcome to Answer Formulation!
       </h1>
       <p 
         className="text-lg text-gray-600 max-w-2xl mx-auto"
         onMouseEnter={() => handleHover('This tool helps you turn your spoken thoughts into clear, well-written answers.')}
+        onClick={() => handleHover('This tool helps you turn your spoken thoughts into clear, well-written answers.')}
       >
         This tool helps you turn your spoken thoughts into clear, well-written answers.
       </p>
       <p 
         className="text-base text-gray-600"
         onMouseEnter={() => handleHover('Let\'s practice together with a sample question.')}
+        onClick={() => handleHover('Let\'s practice together with a sample question.')}
       >
         Let's practice together with a sample question.
       </p>
@@ -90,6 +93,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h2 
         className="text-2xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('Your Practice Question')}
+        onClick={() => handleHover('Your Practice Question')}
       >
         Your Practice Question
       </h2>
@@ -97,6 +101,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-xl text-gray-800 font-medium italic"
           onMouseEnter={() => handleHover(sampleQuestion)}
+          onClick={() => handleHover(sampleQuestion)}
         >
           "{sampleQuestion}"
         </p>
@@ -105,6 +110,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-sm text-yellow-800 flex items-start gap-2"
           onMouseEnter={() => handleHover('This is just for practice. Your answer won\'t be saved.')}
+          onClick={() => handleHover('This is just for practice. Your answer won\'t be saved.')}
         >
           <span className="text-lg">💡</span>
           <span>This is just for practice. Your answer won't be saved.</span>
@@ -130,6 +136,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h2 
         className="text-2xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('Step 1: Speak Your Thoughts')}
+        onClick={() => handleHover('Step 1: Speak Your Thoughts')}
       >
         Step 1: Speak Your Thoughts
       </h2>
@@ -138,12 +145,14 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-sm text-blue-900 mb-2"
           onMouseEnter={() => handleHover('Tip: Don\'t worry about being perfect! Just speak naturally.')}
+          onClick={() => handleHover('Tip: Don\'t worry about being perfect! Just speak naturally.')}
         >
           <strong>💬 Tip:</strong> Don't worry about being perfect! Just speak naturally.
         </p>
         <p 
           className="text-sm text-blue-800 italic"
           onMouseEnter={() => handleHover('For example: "Um, a good friend is someone who, like, listens to you and is there when you need them..."')}
+          onClick={() => handleHover('For example: "Um, a good friend is someone who, like, listens to you and is there when you need them..."')}
         >
           For example: "Um, a good friend is someone who, like, listens to you and is there when you need them..."
         </p>
@@ -171,6 +180,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
             <p 
               className="text-lg font-medium text-gray-700"
               onMouseEnter={() => handleHover('Start Dictating')}
+              onClick={() => handleHover('Start Dictating')}
             >
               Start Dictating
             </p>
@@ -183,12 +193,14 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
             <p 
               className="text-lg font-medium text-gray-700"
               onMouseEnter={() => handleHover('Listening...')}
+              onClick={() => handleHover('Listening...')}
             >
               Listening...
             </p>
             <p 
               className="text-sm text-gray-500"
               onMouseEnter={() => handleHover('Simulating your speech')}
+              onClick={() => handleHover('Simulating your speech')}
             >
               (Simulating your speech)
             </p>
@@ -198,6 +210,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
             <p 
               className="text-base text-gray-700 p-4 bg-white rounded-md border border-gray-300"
               onMouseEnter={() => handleHover(practiceTranscript)}
+              onClick={() => handleHover(practiceTranscript)}
             >
               {practiceTranscript}
             </p>
@@ -222,6 +235,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h2 
         className="text-2xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('Step 2: Refine Your Answer')}
+        onClick={() => handleHover('Step 2: Refine Your Answer')}
       >
         Step 2: Refine Your Answer
       </h2>
@@ -230,6 +244,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-sm font-semibold text-gray-700 mb-2"
           onMouseEnter={() => handleHover('Great! You said:')}
+          onClick={() => handleHover('Great! You said:')}
         >
           Great! You said:
         </p>
@@ -237,6 +252,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <p 
             className="text-base text-gray-700 italic"
             onMouseEnter={() => handleHover(practiceTranscript)}
+            onClick={() => handleHover(practiceTranscript)}
           >
             "{practiceTranscript}"
           </p>
@@ -248,6 +264,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <p 
             className="text-base text-gray-600"
             onMouseEnter={() => handleHover('Now let\'s see how the AI can help organize this.')}
+            onClick={() => handleHover('Now let\'s see how the AI can help organize this.')}
           >
             Now let's see how the AI can help organize this.
           </p>
@@ -277,6 +294,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <p 
             className="text-gray-600 font-medium"
             onMouseEnter={() => handleHover('Refining your answer...')}
+            onClick={() => handleHover('Refining your answer...')}
           >
             Refining your answer...
           </p>
@@ -287,6 +305,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
             <p 
               className="text-sm font-semibold text-gray-700 mb-2"
               onMouseEnter={() => handleHover('Here\'s your refined answer:')}
+              onClick={() => handleHover('Here\'s your refined answer:')}
             >
               Here's your refined answer:
             </p>
@@ -294,6 +313,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
               <p 
                 className="text-lg text-gray-900 font-medium"
                 onMouseEnter={() => handleHover(practiceRefinedAnswer)}
+                onClick={() => handleHover(practiceRefinedAnswer)}
               >
                 "{practiceRefinedAnswer}"
               </p>
@@ -304,6 +324,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
             <p 
               className="text-sm font-semibold text-green-900 mb-2"
               onMouseEnter={() => handleHover('Notice how it:')}
+              onClick={() => handleHover('Notice how it:')}
             >
               Notice how it:
             </p>
@@ -311,6 +332,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
               <li 
                 className="flex items-start gap-2"
                 onMouseEnter={() => handleHover('Removed filler words ("um", "like", "and stuff")')}
+                onClick={() => handleHover('Removed filler words ("um", "like", "and stuff")')}
               >
                 <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>Removed filler words ("um", "like", "and stuff")</span>
@@ -318,6 +340,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
               <li 
                 className="flex items-start gap-2"
                 onMouseEnter={() => handleHover('Improved grammar')}
+                onClick={() => handleHover('Improved grammar')}
               >
                 <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>Improved grammar</span>
@@ -325,6 +348,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
               <li 
                 className="flex items-start gap-2"
                 onMouseEnter={() => handleHover('Kept YOUR ideas (nothing added!)')}
+                onClick={() => handleHover('Kept YOUR ideas (nothing added!)')}
               >
                 <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>Kept YOUR ideas (nothing added!)</span>
@@ -363,6 +387,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h2 
         className="text-2xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('Step 3: Practice Editing')}
+        onClick={() => handleHover('Step 3: Practice Editing')}
       >
         Step 3: Practice Editing
       </h2>
@@ -371,12 +396,14 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-sm text-blue-900 mb-2"
           onMouseEnter={() => handleHover('Let\'s try making a change. Say:')}
+          onClick={() => handleHover('Let\'s try making a change. Say:')}
         >
           Let's try making a change. Say:
         </p>
         <p 
           className="text-base text-blue-800 font-medium italic"
           onMouseEnter={() => handleHover('"Change \'listens\' to \'really listens\'"')}
+          onClick={() => handleHover('"Change \'listens\' to \'really listens\'"')}
         >
           "Change 'listens' to 'really listens'"
         </p>
@@ -418,18 +445,21 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <p 
             className="text-sm text-green-900 mb-2"
             onMouseEnter={() => handleHover('Perfect! The text updated to:')}
+            onClick={() => handleHover('Perfect! The text updated to:')}
           >
             <strong>Perfect!</strong> The text updated to:
           </p>
           <p 
             className="text-base text-green-800 font-medium italic"
             onMouseEnter={() => handleHover(practiceRefinedAnswer)}
+            onClick={() => handleHover(practiceRefinedAnswer)}
           >
             "{practiceRefinedAnswer}"
           </p>
           <p 
             className="text-sm text-green-700 mt-2"
             onMouseEnter={() => handleHover('You can make as many edits as you want!')}
+            onClick={() => handleHover('You can make as many edits as you want!')}
           >
             You can make as many edits as you want!
           </p>
@@ -449,6 +479,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <h1 
         className="text-3xl font-bold text-gray-800"
         onMouseEnter={() => handleHover('You\'re all set!')}
+        onClick={() => handleHover('You\'re all set!')}
       >
         🎉 You're all set!
       </h1>
@@ -457,6 +488,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
         <p 
           className="text-sm font-semibold text-blue-900 mb-3"
           onMouseEnter={() => handleHover('You\'ve learned:')}
+          onClick={() => handleHover('You\'ve learned:')}
         >
           You've learned:
         </p>
@@ -464,6 +496,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <li 
             className="flex items-start gap-2"
             onMouseEnter={() => handleHover('How to dictate your thoughts')}
+            onClick={() => handleHover('How to dictate your thoughts')}
           >
             <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
             <span>How to dictate your thoughts</span>
@@ -471,6 +504,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <li 
             className="flex items-start gap-2"
             onMouseEnter={() => handleHover('How the AI refines your words')}
+            onClick={() => handleHover('How the AI refines your words')}
           >
             <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
             <span>How the AI refines your words</span>
@@ -478,6 +512,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
           <li 
             className="flex items-start gap-2"
             onMouseEnter={() => handleHover('How to edit with voice or keyboard')}
+            onClick={() => handleHover('How to edit with voice or keyboard')}
           >
             <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
             <span>How to edit with voice or keyboard</span>
@@ -488,6 +523,7 @@ const GuidedPractice: React.FC<GuidedPracticeProps> = ({ onComplete, onSkip }) =
       <p 
         className="text-lg text-gray-600"
         onMouseEnter={() => handleHover('Ready to formulate your first real answer?')}
+        onClick={() => handleHover('Ready to formulate your first real answer?')}
       >
         Ready to formulate your first real answer?
       </p>

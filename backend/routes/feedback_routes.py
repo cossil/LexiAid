@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, g
-from backend.app import require_auth
+from backend.decorators import require_auth
 
 feedback_bp = Blueprint('feedback_bp', __name__)
 

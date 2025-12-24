@@ -128,6 +128,46 @@ def delete_user():
 
     return jsonify({'status': 'success', 'message': 'User account and data deleted'}), 200
 
+@user_bp.route('/init', methods=['POST'])
+def initialize_user():
+    """
+    Initialize user profile if it doesn't exist.
+    Used primarily for Google Sign-In and legacy users.
+    """
+    # Verify token
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'status': 'error', 'message': 'No authorization token'}), 401
+
+    auth_svc = current_app.config['SERVICES'].get('AuthService')
+    firestore_svc = current_app.config['SERVICES'].get('FirestoreService')
+
+    if not auth_svc or not firestore_svc:
+        return jsonify({'status': 'error', 'message': 'Services unavailable'}), 503
+
+    # Authenticate
+    success, user_data = auth_svc.verify_id_token(token)
+    if not success or not user_data:
+        return jsonify({'status': 'error', 'message': 'Invalid token'}), 401
+    
+    user_id = user_data['uid']
+    email = user_data.get('email')
+    display_name = user_data.get('name') # 'name' comes from verify_id_token
+
+    if not email:
+        return jsonify({'status': 'error', 'message': 'User has no email'}), 400
+
+    try:
+        created = firestore_svc.ensure_user_profile(user_id, email, display_name)
+        return jsonify({
+            'status': 'success',
+            'message': 'User initialized',
+            'created': created
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error initializing user {user_id}: {e}")
+        return jsonify({'status': 'error', 'message': 'Failed to initialize user'}), 500
+
 @user_bp.route('/profile', methods=['PUT'])
 def update_user_profile():
     """Update user profile (Preferences & Display Name)"""
@@ -152,8 +192,6 @@ def update_user_profile():
     # Validate Request
     try:
         data = UserUpdateRequest(**request.json)
-        print(f"DEBUG: Received update request: {request.json}")
-        print(f"DEBUG: Parsed Pydantic data: display_name={data.display_name}")
     except ValidationError as e:
         return jsonify({'status': 'error', 'message': e.errors()}), 400
 
@@ -162,10 +200,8 @@ def update_user_profile():
     display_name_to_update = data.display_name
     if not display_name_to_update and 'displayName' in request.json:
         display_name_to_update = request.json['displayName']
-        print(f"DEBUG: Using raw displayName from JSON: {display_name_to_update}")
 
     if display_name_to_update:
-        print(f"DEBUG: Updating Auth User {user_id} with name: {display_name_to_update}")
         auth_svc.update_user(user_id, {'display_name': display_name_to_update})
         firestore_svc.update_user(user_id, {'displayName': display_name_to_update})
 

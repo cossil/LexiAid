@@ -173,6 +173,32 @@ class FirestoreService:
         doc_ref.set(user_data)
         return user_id
     
+    def ensure_user_profile(self, user_id: str, email: str, display_name: Optional[str] = None) -> bool:
+        """
+        Ensure a user profile exists in Firestore. If not, create it.
+        
+        Args:
+            user_id: Firebase Auth UID
+            email: User email
+            display_name: Optional display name
+            
+        Returns:
+            True if a NEW profile was created, False if it already existed
+        """
+        doc_ref = self.db.collection('users').document(user_id)
+        doc = doc_ref.get()
+        
+        if doc.exists:
+            return False
+            
+        # Profile doesn't exist, create it
+        user_data = {
+            'email': email,
+            'displayName': display_name
+        }
+        self.create_user(user_id, user_data)
+        return True
+
     def update_user(self, user_id: str, user_data: Dict[str, Any]) -> bool:
         """
         Update user data in Firestore
@@ -435,6 +461,164 @@ class FirestoreService:
         doc_ref = self.db.collection('feedback_reports').document()
         doc_ref.set(payload)
         return doc_ref.id
+    
+    def get_all_feedback(self, limit: int = 50, offset: int = 0, 
+                         status: Optional[str] = None, 
+                         feedback_type: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Retrieve all feedback reports for admin review.
+        
+        Args:
+            limit: Maximum number of feedback items to return (default 50)
+            offset: Number of items to skip for pagination (default 0)
+            status: Optional filter by status ('new', 'reviewed', 'resolved')
+            feedback_type: Optional filter by type ('bug', 'accessibility', 'suggestion')
+            
+        Returns:
+            Dictionary containing feedback list and pagination info
+        """
+        try:
+            # Build query with optional filters
+            query = self.db.collection('feedback_reports')
+            
+            if status:
+                query = query.where('status', '==', status)
+            if feedback_type:
+                query = query.where('type', '==', feedback_type)
+            
+            # Order by created_at descending (newest first)
+            query = query.order_by('created_at', direction=google_firestore.Query.DESCENDING)
+            
+            # Get total count for pagination (using count aggregation)
+            count_query = self.db.collection('feedback_reports')
+            if status:
+                count_query = count_query.where('status', '==', status)
+            if feedback_type:
+                count_query = count_query.where('type', '==', feedback_type)
+            
+            total_count = 0
+            try:
+                count_result = count_query.count().get()
+                total_count = count_result[0][0].value if count_result else 0
+            except Exception as count_err:
+                logger.warning(f"Count aggregation failed, falling back to estimate: {count_err}")
+                # Fallback: don't provide total count
+                total_count = -1
+            
+            # Apply pagination
+            if offset > 0:
+                # For offset-based pagination, we need to skip documents
+                # This is less efficient but simpler for admin use
+                all_docs = list(query.limit(offset + limit).stream())
+                docs = all_docs[offset:offset + limit]
+            else:
+                docs = list(query.limit(limit).stream())
+            
+            feedback_list = []
+            for doc in docs:
+                data = doc.to_dict()
+                # Convert timestamp to ISO string if present
+                created_at = data.get('created_at')
+                if created_at and hasattr(created_at, 'isoformat'):
+                    data['created_at'] = created_at.isoformat()
+                elif created_at and hasattr(created_at, 'timestamp'):
+                    data['created_at'] = datetime.datetime.fromtimestamp(created_at.timestamp()).isoformat()
+                
+                feedback_list.append({
+                    'id': doc.id,
+                    **data
+                })
+            
+            return {
+                'feedback': feedback_list,
+                'pagination': {
+                    'total': total_count if total_count >= 0 else None,
+                    'limit': limit,
+                    'offset': offset,
+                    'returned': len(feedback_list)
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error fetching feedback: {e}")
+            return {
+                'feedback': [],
+                'pagination': {'total': 0, 'limit': limit, 'offset': offset, 'returned': 0},
+                'error': str(e)
+            }
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get aggregated statistics for admin dashboard.
+        Uses Firestore count() aggregation queries for efficiency.
+        
+        Returns:
+            Dictionary containing counts for users, documents, and feedback
+        """
+        stats = {
+            'users': {'total': 0, 'with_documents': 0},
+            'documents': {
+                'total': 0,
+                'by_status': {'processed': 0, 'processing': 0, 'failed': 0, 'pending': 0}
+            },
+            'feedback': {
+                'total': 0,
+                'by_status': {'new': 0, 'reviewed': 0, 'resolved': 0},
+                'by_type': {'bug': 0, 'accessibility': 0, 'suggestion': 0, 'other': 0}
+            },
+            'generated_at': datetime.datetime.utcnow().isoformat() + 'Z'
+        }
+        
+        try:
+            # --- Users count ---
+            try:
+                users_count = self.db.collection('users').count().get()
+                stats['users']['total'] = users_count[0][0].value if users_count else 0
+            except Exception as e:
+                logger.warning(f"Failed to count users: {e}")
+            
+            # --- Documents count ---
+            try:
+                docs_count = self.db.collection('documents').count().get()
+                stats['documents']['total'] = docs_count[0][0].value if docs_count else 0
+                
+                # Count by status
+                for status in ['processed', 'processing', 'failed', 'pending']:
+                    try:
+                        status_count = self.db.collection('documents').where('status', '==', status).count().get()
+                        stats['documents']['by_status'][status] = status_count[0][0].value if status_count else 0
+                    except Exception:
+                        pass  # Keep default 0
+            except Exception as e:
+                logger.warning(f"Failed to count documents: {e}")
+            
+            # --- Feedback count ---
+            try:
+                feedback_count = self.db.collection('feedback_reports').count().get()
+                stats['feedback']['total'] = feedback_count[0][0].value if feedback_count else 0
+                
+                # Count by status
+                for status in ['new', 'reviewed', 'resolved']:
+                    try:
+                        status_count = self.db.collection('feedback_reports').where('status', '==', status).count().get()
+                        stats['feedback']['by_status'][status] = status_count[0][0].value if status_count else 0
+                    except Exception:
+                        pass
+                
+                # Count by type
+                for fb_type in ['bug', 'accessibility', 'suggestion', 'other']:
+                    try:
+                        type_count = self.db.collection('feedback_reports').where('type', '==', fb_type).count().get()
+                        stats['feedback']['by_type'][fb_type] = type_count[0][0].value if type_count else 0
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(f"Failed to count feedback: {e}")
+            
+        except Exception as e:
+            logger.error(f"Error generating stats: {e}")
+            stats['error'] = str(e)
+        
+        return stats
     
     def get_user_documents(self, user_id: str, folder_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """

@@ -19,6 +19,7 @@ import {
   PenTool, // Added for Answer Formulation icon
   LifeBuoy,
   Megaphone,
+  Shield, // Added for Admin Console icon
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +27,7 @@ import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useDocument } from '../contexts/DocumentContext';
 import { useQuiz } from '../contexts/QuizContext';
 import { toast } from 'react-hot-toast';
+import { isAdminEmail } from '../config/admin';
 
 // Define a discriminated union for navigation link types
 type NavLinkEntry = 
@@ -109,6 +111,9 @@ const DashboardLayout: React.FC = () => {
     }
   }, [activeDocumentId, navigate]);
   
+  // Check if current user is an admin
+  const showAdminLink = isAdminEmail(currentUser?.email);
+
   // Navigation links with icons and accessibility support
   const navLinks: NavLinkEntry[] = [
     { to: '/dashboard', text: 'Dashboard', icon: <FileText className="w-5 h-5" /> },
@@ -120,6 +125,8 @@ const DashboardLayout: React.FC = () => {
     { to: '/dashboard/upload', text: 'Upload Document', icon: <Upload className="w-5 h-5" /> },
     { to: '/dashboard/feedback', text: 'Feedback', icon: <Megaphone className="w-5 h-5" /> },
     { to: '/dashboard/settings', text: 'Settings', icon: <Settings className="w-5 h-5" /> },
+    // Admin Console - only visible to admin users
+    ...(showAdminLink ? [{ to: '/dashboard/admin', text: 'Admin Console', icon: <Shield className="w-5 h-5" /> }] : []),
   ];
   
   return (

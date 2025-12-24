@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification // Import sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
@@ -141,7 +142,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentUser]);
 
   const signInCallback = useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // Check email verification
+    if (!userCredential.user.emailVerified) {
+      await firebaseSignOut(auth);
+      throw new Error('Please verify your email address before logging in.');
+    }
+
+    // Initialize profile just in case (e.g., legacy user or sync issue)
+    try {
+      await apiService.initializeUser();
+    } catch (err) {
+      console.warn('[AuthContext] Failed to auto-initialize user on login:', err);
+      // We don't block login here, as the user exists in Auth and is verified.
+      // The profile might already exist, or the backend call failed.
+    }
   }, []);
 
   const signUpCallback = useCallback(async (email: string, password: string, displayName: string): Promise<SignUpResult> => {
@@ -156,14 +172,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       console.log('[AuthContext:signUpCallback] Backend user creation successful');
 
-      // 2. Sign In to establish session
+      // 2. Sign In to establish session (required to send verification email)
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('[AuthContext:signUpCallback] User signed in successfully');
+      
+      // 3. Send Verification Email
+      await sendEmailVerification(userCredential.user);
+      
+      // 4. Sign Out immediately (enforce verification before access)
+      await firebaseSignOut(auth);
+      console.log('[AuthContext:signUpCallback] Verification email sent, user signed out');
 
-      return { user: userCredential.user, partial: false };
+      return { user: null, partial: false }; // Return null user to indicate "not logged in"
     } catch (error: any) {
       console.error('[AuthContext:signUpCallback] Signup failed:', error);
-      // Return a structured error
       return { 
         user: null, 
         partial: false, 
@@ -194,11 +215,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const provider = new GoogleAuthProvider();
     try {
       console.log('[AuthContext:signInWithGoogleCallback] Attempting Google Sign-In via popup...');
-      // Note: Google Sign-In currently bypasses our backend creation logic.
-      // Ideally, we should have a backend endpoint to "sync" or "onboard" Google users if they don't exist.
-      // For now, we leave this as is, but it's a known gap for "Backend Schema Ownership" if the trigger isn't set up.
       await signInWithPopup(auth, provider);
       console.log('[AuthContext:signInWithGoogleCallback] Google Sign-In popup initiated successfully.');
+      
+      // Initialize profile for Google users (prevents "Ghost User" issue)
+      try {
+        console.log('[AuthContext] Initializing Google user profile...');
+        await apiService.initializeUser();
+        console.log('[AuthContext] Google user profile initialized.');
+      } catch (err) {
+        console.error('[AuthContext] Failed to initialize Google user profile:', err);
+        // We log but don't throw, allowing the user to proceed (worst case: default profile loading in components)
+      }
+
     } catch (error: any) {
       console.error('[AuthContext:signInWithGoogleCallback] Error during Google Sign-In popup:', error);
       if (error.code) {

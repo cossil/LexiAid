@@ -226,3 +226,59 @@ class AuthService:
         except Exception as e:
             print(f"Error generating password reset link: {e}")
             return None
+    
+    def list_users(self, page_token: Optional[str] = None, max_results: int = 50) -> Dict[str, Any]:
+        """
+        List all users from Firebase Auth with pagination support.
+        
+        Args:
+            page_token: Token for fetching the next page of results
+            max_results: Maximum number of users to return (1-1000, default 50)
+            
+        Returns:
+            Dictionary containing:
+                - users: List of user data dictionaries
+                - page_token: Token for next page (None if no more pages)
+                - has_more: Boolean indicating if more pages exist
+        """
+        try:
+            # Clamp max_results to valid range
+            max_results = max(1, min(max_results, 1000))
+            
+            # List users with pagination
+            page = auth.list_users(max_results=max_results, page_token=page_token)
+            
+            users = []
+            for user in page.users:
+                user_data = {
+                    'uid': user.uid,
+                    'email': user.email,
+                    'displayName': user.display_name,
+                    'emailVerified': user.email_verified,
+                    'disabled': user.disabled,
+                    'createdAt': (
+                        datetime.fromtimestamp(user.user_metadata.creation_timestamp / 1000).isoformat()
+                        if user.user_metadata and user.user_metadata.creation_timestamp else None
+                    ),
+                    'lastSignIn': (
+                        datetime.fromtimestamp(user.user_metadata.last_sign_in_timestamp / 1000).isoformat()
+                        if user.user_metadata and user.user_metadata.last_sign_in_timestamp else None
+                    ),
+                    'photoURL': user.photo_url,
+                    'phoneNumber': user.phone_number
+                }
+                users.append(user_data)
+            
+            return {
+                'users': users,
+                'page_token': page.next_page_token,
+                'has_more': page.has_next_page
+            }
+        except Exception as e:
+            print(f"Error listing users: {e}")
+            return {
+                'users': [],
+                'page_token': None,
+                'has_more': False,
+                'error': str(e)
+            }

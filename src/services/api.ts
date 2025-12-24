@@ -1,5 +1,12 @@
 import axios from 'axios';
 import { auth } from '../firebase/config'; // Import auth directly
+import type {
+  AdminStatsResponse,
+  AdminUsersParams,
+  AdminUsersResponse,
+  AdminFeedbackParams,
+  AdminFeedbackResponse,
+} from '../types/admin';
 
 // Create an axios instance with default config
 const api = axios.create({
@@ -377,6 +384,54 @@ export const apiService = {
     
     return response.data;
   },
+
+  // ============ ADMIN API METHODS ============
+
+  /**
+   * Get admin dashboard statistics
+   * @throws 403 if user is not an admin
+   */
+  async getAdminStats(): Promise<AdminStatsResponse> {
+    const response = await api.get('/api/admin/stats');
+    return response.data;
+  },
+
+  /**
+   * List all users with pagination
+   * @param params - Optional pagination parameters
+   * @throws 403 if user is not an admin
+   */
+  async getAdminUsers(params?: AdminUsersParams): Promise<AdminUsersResponse> {
+    const response = await api.get('/api/admin/users', { params });
+    return response.data;
+  },
+
+  /**
+   * Get all feedback reports with filtering
+   * @param params - Optional filter and pagination parameters
+   * @throws 403 if user is not an admin
+   */
+  async getAdminFeedback(params?: AdminFeedbackParams): Promise<AdminFeedbackResponse> {
+    const response = await api.get('/api/admin/feedback', { params });
+    return response.data;
+  },
+
+  /**
+   * Initialize user profile if it doesn't exist.
+   * Used for Google Sign-In and legacy users.
+   */
+  async initializeUser(): Promise<{ status: string; message: string; created: boolean }> {
+    const response = await api.post('/api/users/init');
+    return response.data;
+  },
+
+  /**
+   * Sync all Auth users to Firestore Profiles (Admin only)
+   */
+  async syncUsers(): Promise<{ success: boolean; data: { processed: number; fixed: number } }> {
+    const response = await api.post('/api/admin/users/sync');
+    return response.data;
+  },
 };
 
 // TypeScript Interfaces for Answer Formulation
@@ -410,5 +465,17 @@ export interface EditAnswerResponse {
   audio_content_base64?: string | null;
   timepoints?: any[] | null;
 }
+
+// Re-export admin types for convenience
+export type {
+  AdminStatsResponse,
+  AdminStats,
+  AdminUsersParams,
+  AdminUsersResponse,
+  AdminUser,
+  AdminFeedbackParams,
+  AdminFeedbackResponse,
+  AdminFeedbackItem,
+} from '../types/admin';
 
 export default apiService;

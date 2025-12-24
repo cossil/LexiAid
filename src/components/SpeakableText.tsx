@@ -91,12 +91,29 @@ export const SpeakableText: React.FC<SpeakableTextProps> = ({
     // If specific components need this behavior, they can pass an
     // onMouseLeave handler that calls cancelSpeech().
   };
+
+  /**
+   * Handle click/tap for touch device support (iPad/iPhone).
+   * Allows event bubbling so parent links still work (Speak & Go behavior).
+   */
+  const handleClick = () => {
+    // Only speak if TTS is enabled
+    if (!uiTtsEnabled) return;
+    
+    // Choose appropriate TTS method based on content type and settings
+    if (isDocumentContent && cloudTtsEnabled) {
+      speakText(text);
+    } else {
+      speakText(text);
+    }
+  };
   
   return (
     <span 
       className={`relative z-10 ${className}`}
       onMouseEnter={handleTextHover}
       onMouseLeave={handleTextLeave}
+      onClick={handleClick}
       aria-label={ariaLabel || text}
     >
       {text}

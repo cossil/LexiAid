@@ -1,185 +1,232 @@
-# **Active Dependency Graph**
+# Active Dependency Graph (Golden Source)
 
-Document Version: 2.0 (Converged)  
-Status: Verified Audit
+**Authority:** Verified against live code in `src/` and `backend/` (Dec 23, 2025)
 
-## **1\. Overview**
-
-This document maps the **verified** end-to-end dependencies for the LexiAid application. It traces the execution flow from Frontend Components down to Backend Services and External APIs.
-
-**Key Architectural Findings:**
-
-* **Centralized Supervision:** The Chat and Quiz features are tightly coupled, sharing the same frontend interface (ChatPage) and backend orchestrator (SupervisorGraph).  
-* **Modernized Upload Pipeline:** The document upload process uses a specialized LangGraph agent (run\_dua\_processing\_for\_document) that communicates directly with Vertex AI, bypassing the legacy DocAIService.  
-* **Dual-Mode TTS:** The audio system implements a smart fallback, prioritizing pre-generated GCS assets before falling back to on-demand synthesis.
+This document describes the **active** (reachable) dependency graph starting from the real entry points:
+- **Frontend entry:** `src/main.tsx` → `src/App.tsx`
+- **Backend entry:** `backend/app.py` (Flask app + blueprint registrations)
 
 ---
 
-## **2\. Feature: Chat & Quiz System**
+## 1) Frontend Dependency Tree (Active)
 
-### **Frontend Flow**
+### Entry Point
+- `src/main.tsx` renders `<App />`.
 
-**Entry Point:** src/pages/ChatPage.tsx
+### Router + Providers
+- `src/App.tsx`
+  - **Global providers**
+    - `AuthProvider` (`src/contexts/AuthContext.tsx`)
+    - `AccessibilityProvider` (`src/contexts/AccessibilityContext.tsx`)
+  - **Protected dashboard subtree**
+    - `DocumentProvider` (`src/contexts/DocumentContext.tsx`)
+    - `QuizProvider` (`src/contexts/QuizContext.tsx`)
+  - **Dev-only route (development builds only)**
+    - `/dev/deprecation-showcase` → lazy `src/pages/dev/DeprecationShowcase`
 
-Code snippet
+### Active Routes (from `src/App.tsx`)
 
-graph TD  
-    Page\[ChatPage\] \--\> UI\[GeminiChatInterface\]  
-    UI \--\> Audio\[useRealtimeStt / MicrophoneButton\]  
-    UI \--\> Player\[useTTSPlayer\]  
-    UI \--\> API\[apiService.chat / uploadAudioMessage\]  
-      
-    Audio \--\>|WebSocket| WSS\[wss://api/stt/stream\]  
-    API \--\>|POST| Endpoint\[/api/v2/agent/chat\]
+#### Public
+- `/` → `src/pages/LandingPage.tsx`
+- `/about` → `src/pages/public/About.tsx`
+- `/privacy` → `src/pages/public/Privacy.tsx`
+- `/terms` → `src/pages/public/Terms.tsx`
 
-### **Backend Flow**
+#### Auth (wrapped in `PublicLayout`)
+- `/auth/signin` → `src/pages/auth/SignIn.tsx`
+- `/auth/signup` → `src/pages/auth/SignUp.tsx`
+- `/auth/reset-password` → `src/pages/auth/ResetPassword.tsx`
 
-**Entry Point:** backend/app.py (agent\_chat\_route)
+#### Dashboard (wrapped in `ProtectedRoute` + `DashboardLayout`)
+- `/dashboard` (index) → `src/pages/Dashboard.tsx`
+- `/dashboard/upload` → `src/pages/DocumentUpload.tsx`
+- `/dashboard/documents` → `src/pages/DocumentsList.tsx`
+- `/dashboard/documents/:id` → `src/pages/DocumentView.tsx`
+- `/dashboard/chat` → `src/pages/ChatPage.tsx`
+- `/dashboard/answer-formulation` → `src/pages/AnswerFormulationPage.tsx`
+- `/dashboard/feedback` → `src/pages/DashboardFeedback.tsx`
+- `/dashboard/settings` → `src/pages/Settings.tsx`
+- `/dashboard/admin` → `src/pages/admin/AdminDashboard.tsx`
 
-Code snippet
+### Frontend “service layer” / API calls
+- `src/services/api.ts`
+  - Axios baseURL: `import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'`
+  - Adds Firebase ID token via `Authorization: Bearer <idToken>` in a request interceptor.
 
-graph TD  
-    Endpoint\[/api/v2/agent/chat\] \--\> Auth\[@require\_auth\]  
-    Auth \--\> Supervisor\[Supervisor Graph\]  
-      
-    Supervisor \--\>|Intent: Chat| ChatGraph\[New Chat Graph\]  
-    Supervisor \--\>|Intent: Start Quiz| QuizGraph\[Quiz Engine Graph\]  
-      
-    ChatGraph \--\> Retr\[DocumentRetrievalService\]  
-    ChatGraph \--\> Gemini\[ChatGoogleGenerativeAI\]  
-      
-    QuizGraph \--\> Gemini  
-    QuizGraph \--\> State\[QuizEngineState\]  
-      
-    Supervisor \--\> TTS\[TTSService\]  
-    TTS \--\> Output\[Audio Response\]
-
----
-
-## **3\. Feature: Document Upload & Processing**
-
-### **Frontend Flow**
-
-**Entry Point:** src/pages/DocumentUpload.tsx
-
-Code snippet
-
-graph TD  
-    Page\[DocumentUpload\] \--\> Validation\[File Type/Size Check\]  
-    Page \--\>|Direct Axios Call| Endpoint\[/api/documents/upload\]  
-      
-    note\[Note: Tech Debt \- Bypasses apiService\]  
-    Page \-.-\> note
-
-### **Backend Flow**
-
-**Entry Point:** backend/routes/document\_routes.py
-
-Code snippet
-
-graph TD  
-    Endpoint\[/api/documents/upload\] \--\> Auth\[@auth\_required\]  
-    Auth \--\> GCS\[StorageService\]  
-    GCS \--\>|File URI| DUA\[Document Understanding Agent\]  
-      
-    subgraph "DUA Graph (Legacy Pattern)"  
-        DUA \--\> Vertex\[Vertex AI GenerativeModel\]  
-        Vertex \--\> Narrative\[TTS-Ready Narrative\]  
-    end  
-      
-    Narrative \--\> Firestore\[FirestoreService\]  
-    Narrative \--\> TTS\[TTSService\]  
-    TTS \--\>|Pre-generate| Assets\[Audio & Timepoints\]  
-    Assets \--\> GCS
+### Frontend “feature hooks”
+- **TTS playback:** `src/hooks/useTTSPlayer.ts`
+  - Prefers **pre-generated** assets via `GET /api/documents/:id/tts-assets`.
+  - Falls back to **on-demand** synthesis via `POST /api/tts/synthesize`.
+- **Realtime STT:** `src/hooks/useRealtimeStt.ts`
+  - WebSocket to `.../api/stt/stream`.
 
 ---
 
-## **4\. Feature: Answer Formulation**
+## 2) Backend Dependency Tree (Active)
 
-### **Frontend Flow**
+### Entry Point
+- `backend/app.py`
 
-**Entry Point:** src/pages/AnswerFormulationPage.tsx
+### Registered Blueprints (Active)
+Registered in `backend/app.py`:
+- `/api/documents/*` → `backend/routes/document_routes.py` (`document_bp`)
+- `/api/tts/*` → `backend/routes/tts_routes.py` (`tts_bp`)
+- `/api/stt/*` → `backend/routes/stt_routes.py` (`stt_bp`)
+- `/api/users/*` → `backend/routes/user_routes.py` (`user_bp`)
+- `/api/progress/*` → `backend/routes/progress_routes.py` (`progress_bp`)
+- `/api/v2/answer-formulation/*` → `backend/routes/answer_formulation_routes.py` (`answer_formulation_bp`)
+- `/api/feedback/*` → `backend/routes/feedback_routes.py` (`feedback_bp`)
+- `/api/admin/*` → `backend/routes/admin_routes.py` (`admin_bp`)
 
-Code snippet
+### Direct (non-blueprint) routes in `backend/app.py`
+- `POST /api/v2/agent/chat` (protected by `@require_auth`) → supervisor-based agent orchestration
+- `GET /api/v2/agent/history` (protected by `@require_auth`) → reads supervisor checkpoint state
+- `POST /api/tts/synthesize` (protected by `@require_auth`) → on-demand MP3 synthesis (base64) + timepoints
+- `GET /api/health`
 
-graph TD  
-    Page\[AnswerFormulationPage\] \--\> Hook\[useAnswerFormulation\]  
-    Hook \--\> STT\[useRealtimeStt\]  
-    Hook \--\> API\[apiService\]  
-      
-    API \--\>|Refine| EpRefine\[/api/v2/answer-formulation/refine\]  
-    API \--\>|Edit| EpEdit\[/api/v2/answer-formulation/edit\]
+### WebSocket routes
+- `WS /api/stt/stream` (implemented directly in `backend/app.py` via `flask_sock`)
 
-### **Backend Flow**
+### Authentication / authorization
+- Primary decorator: `backend/decorators/auth.py` → `require_auth`
+- Admin gating: `backend/decorators/__init__.py` exports `require_admin` (used by `backend/routes/admin_routes.py`)
+- Note: `backend/routes/document_routes.py` also implements its own `auth_required` decorator (Firebase token verification via `AUTH_SERVICE`).
 
-**Entry Point:** backend/routes/answer\_formulation\_routes.py
+### Services initialized at app startup
+In `backend/app.py`, `app.config['SERVICES']` is populated with:
+- `AuthService`
+- `FirestoreService`
+- `StorageService`
+- `DocAIService`
+- `TTSService`
+- `STTService`
+- `DocumentRetrievalService` (stored under key `DocRetrievalService`)
 
-Code snippet
-
-graph TD  
-    Endpoint\[Route Handler\] \--\> Graph\[Answer Formulation Graph\]  
-      
-    Graph \--\> Node1\[Validate Input\]  
-    Graph \--\> Node2\[Refine Answer\]  
-    Graph \--\> Node3\[Apply Edit\]  
-      
-    Node2 & Node3 \--\> Gemini\[ChatGoogleGenerativeAI\]  
-    Graph \--\> TTS\[TTSService\]  
-    TTS \--\> Response\[Audio Output\]
-
----
-
-## **5\. Feature: Audio Output (TTS)**
-
-### **Frontend Strategy (useTTSPlayer)**
-
-The frontend uses a unified hook with an intelligent fallback strategy.
-
-1. **Primary Path:** Check for pre-generated assets.  
-   * Call apiService.getTtsAssets(docId) $\\rightarrow$ Get Signed GCS URLs.  
-   * Stream audio directly from Google Cloud Storage (Low Latency, Low Cost).  
-2. **Fallback Path:** If assets are missing or request is dynamic (Chat).  
-   * Call apiService.synthesizeText(text) $\\rightarrow$ Backend TTSService.  
-   * Generate MP3 via Google Cloud TTS API (Higher Latency).
-
-### **Backend Service (TTSService)**
-
-* **Inputs:** Text, Voice Settings (from AuthContext/Firestore).  
-* **Processing:**  
-  * Sanitizes text.  
-  * Chunks long text to respect API limits.  
-  * Requests audio \+ timepoints from Google Cloud.  
-* **Outputs:** Base64 encoded MP3 \+ JSON Timepoints.
-
----
-
-## **6\. Data Persistence Layer**
-
-### **Firestore Database**
-
-* **Users:** Stores profiles and preferences (Synced via AuthContext).  
-* **Documents:** Stores metadata (gcs\_uri, processing\_status) and content (dua\_narrative\_content).  
-  * *Note: Progress/Gamification fields exist in the schema but are currently unused stubs.*
-
-### **Google Cloud Storage**
-
-* **Uploads:** Stores original user files (PDF, Images).  
-* **Assets:** Stores pre-generated TTS audio files (.mp3) and timepoint maps (.json).
-
-### **LangGraph Checkpoints (SQLite)**
-
-* **Files:** supervisor\_checkpoints.db, quiz\_checkpoints.db, answer\_formulation\_sessions.db.  
-* **Role:** Persists active conversation threads and quiz sessions across server restarts (though currently stored in ephemeral container storage \- **P0 Fix Required**).
+### Graphs / Agent systems
+- Supervisor orchestration
+  - `backend/graphs/supervisor/*` (compiled in `backend/app.py`)
+  - Drives `POST /api/v2/agent/chat`
+- New chat graph
+  - `backend/graphs/new_chat_graph.py` (compiled in `backend/app.py`)
+  - Uses `DocumentRetrievalService` to fetch document content for RAG
+- Quiz engine graph
+  - `backend/graphs/quiz_engine_graph.py` (compiled in `backend/app.py`)
+- Answer formulation graph
+  - `backend/graphs/answer_formulation/graph.py` (compiled in `backend/app.py`)
+  - Driven by blueprint routes `POST /api/v2/answer-formulation/refine` and `POST /api/v2/answer-formulation/edit`
+- Document Understanding Agent (DUA)
+  - `backend/graphs/document_understanding_agent/graph.py`
+  - Invoked from `backend/routes/document_routes.py` on upload for eligible formats
 
 ---
 
-## **7\. Cross-Cutting Dependencies**
+## 3) Core User Flows (Verified)
 
-### **Authentication (AuthContext \+ AuthService)**
+### A) Document Upload & Processing
 
-* **Frontend:** Wraps the entire app. Handles Firebase login and syncs user preferences (font size, high contrast) to Firestore.  
-* **Backend:** Validates the Firebase ID Token (Bearer ...) on every protected route request.
+#### Frontend
+- Route: `/dashboard/upload` → `src/pages/DocumentUpload.tsx`
+- Upload request:
+  - `POST {VITE_BACKEND_API_URL || http://localhost:8081}/api/documents/upload`
+  - Headers: `Authorization: Bearer <Firebase ID token>`
+  - Body: multipart form-data (`file`, `name`)
 
-### **Accessibility (AccessibilityContext)**
+#### Backend
+- Route: `POST /api/documents/upload` → `backend/routes/document_routes.py::upload_document`
+  - Creates Firestore document metadata (initial status).
+  - Uploads original file to GCS (via `StorageService`).
+  - For eligible formats:
+    - **DUA**: runs `run_dua_processing_for_document(...)` and writes `dua_narrative_content`.
+    - **Native text extract**: for `docx/txt/md`, stores extracted text in `dua_narrative_content`.
+  - **Pre-generates TTS assets** for substantial extracted content:
+    - uploads `tts_audio_gcs_uri` (MP3)
+    - uploads `tts_timepoints_gcs_uri` (JSON)
 
-* **Frontend:** Consumes preferences from AuthContext. Controls the global UI theme (High Contrast) and manages the browser's speechSynthesis API for UI element hover effects.
+### B) Document View + Read Aloud (TTS)
+
+#### Frontend
+- Route: `/dashboard/documents/:id` → `src/pages/DocumentView.tsx`
+- Loads content:
+  - `GET {VITE_BACKEND_API_URL || http://localhost:8081}/api/documents/:id?include_content=true`
+- Read aloud:
+  - Uses `src/hooks/useTTSPlayer.ts`
+  - Primary: `GET /api/documents/:id/tts-assets`
+  - Fallback: `POST /api/tts/synthesize` with `{ text }`
+
+#### Backend
+- `GET /api/documents/<id>/tts-assets` → `backend/routes/document_routes.py::get_tts_assets`
+  - Returns signed URLs: `{ audio_url, timepoints_url }` for assets stored in GCS.
+- `POST /api/tts/synthesize` → `backend/app.py::tts_synthesize_route`
+  - Returns `{ audio_content: <base64 mp3>, timepoints: [...] }`
+
+### C) Chat (and Quiz)
+
+#### Frontend
+- Route: `/dashboard/chat` → `src/pages/ChatPage.tsx`
+- Text chat:
+  - `apiService.chat(...)` → `POST /api/v2/agent/chat`
+- History restore:
+  - `apiService.getChatHistory(threadId)` → `GET /api/v2/agent/history?thread_id=...`
+- Quiz start:
+  - Sends `query: '/start_quiz', mode: 'quiz', documentId: <id>`
+
+#### Backend
+- `POST /api/v2/agent/chat` → `backend/app.py::agent_chat_route`
+  - Uses `compiled_supervisor_graph.invoke(...)` (wrapped by `safe_supervisor_invoke`).
+  - Persists state via LangGraph Sqlite checkpointers (see `DatabaseManager` in `backend/app.py`).
+- `GET /api/v2/agent/history` → `backend/app.py::get_chat_history_route`
+  - Reads supervisor state and returns normalized message history.
+
+### D) Answer Formulation
+
+#### Frontend
+- Route: `/dashboard/answer-formulation` → `src/pages/AnswerFormulationPage.tsx`
+- Calls:
+  - `POST /api/v2/answer-formulation/refine`
+  - `POST /api/v2/answer-formulation/edit`
+- Dictation:
+  - Uses `useRealtimeStt` → `WS /api/stt/stream`
+
+#### Backend
+- `POST /api/v2/answer-formulation/refine` → `backend/routes/answer_formulation_routes.py::refine_answer`
+  - Invokes `ANSWER_FORMULATION_GRAPH` and returns refined answer + TTS (base64) when available.
+- `POST /api/v2/answer-formulation/edit` → `backend/routes/answer_formulation_routes.py::edit_answer`
+  - Loads session state from `ANSWER_FORMULATION_CHECKPOINTER`, applies edit via graph, returns updated answer + TTS.
+
+### E) Feedback + Admin
+
+#### Feedback
+- Frontend: `/dashboard/feedback` → `src/pages/DashboardFeedback.tsx`
+- Backend: `POST /api/feedback` → `backend/routes/feedback_routes.py::submit_feedback` (requires auth)
+
+#### Admin
+- Frontend: `/dashboard/admin` → `src/pages/admin/AdminDashboard.tsx`
+- Backend:
+  - `GET /api/admin/stats`
+  - `GET /api/admin/users`
+  - `GET /api/admin/feedback`
+  - `POST /api/admin/users/sync`
+  - All protected by `@require_auth` + `@require_admin`
+
+### F) Realtime STT Streaming
+
+#### Frontend
+- `src/hooks/useRealtimeStt.ts` connects to `WS /api/stt/stream`.
+
+#### Backend
+- `backend/app.py::stt_stream` uses Google Cloud Speech streaming and sends JSON frames:
+  - `{ is_final, transcript, stability }`
+
+---
+
+## 4) Known Mismatches / Risks (Verified)
+
+- **Document upload response shape mismatch (frontend vs backend):**
+  - Backend upload returns `{"document_id": ..., "name": ..., ...}` (see `backend/routes/document_routes.py`).
+  - Frontend `DocumentUpload.tsx` currently navigates using `response.data.document.id`, which does **not** match the backend response shape.
+  - This is a functional risk: upload may succeed but navigation may fail.
+
+- **Multiple baseURL defaults across the frontend:**
+  - `src/services/api.ts` defaults to `http://localhost:8000`.
+  - `DocumentUpload.tsx` and `DocumentView.tsx` default to `http://localhost:8081`.
+  - If `VITE_BACKEND_API_URL` isn’t consistent, different pages may hit different ports.

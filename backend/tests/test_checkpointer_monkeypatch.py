@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch, MagicMock
 from langchain_core.messages import HumanMessage, AIMessage
 
 # Import the monkeypatch functions
-from backend.diagnostics.langgraph_patch import _safe_put, _deep_serialize_for_json, _prepare_args_for_put
+from backend.utils.langgraph_serialization import _safe_put, _deep_serialize_for_json, _prepare_args_for_put
 
 
 class TestSqliteSaverMonkeypatch:
@@ -74,7 +74,7 @@ class TestSqliteSaverMonkeypatch:
         assert isinstance(new_args[0], dict)
         assert isinstance(new_kwargs["message"], dict)
 
-    @patch('backend.diagnostics.langgraph_patch._original_put')
+    @patch('backend.utils.langgraph_serialization._original_put')
     def test_safe_put_with_serializable_args(self, mock_original_put):
         """Test _safe_put with already serializable arguments."""
         mock_original_put.return_value = "success"
@@ -94,7 +94,7 @@ class TestSqliteSaverMonkeypatch:
         assert call_args[0][1] == args[0]  # the actual data arg
         assert call_args[1] == kwargs
 
-    @patch('backend.diagnostics.langgraph_patch._original_put')
+    @patch('backend.utils.langgraph_serialization._original_put')
     def test_safe_put_with_human_message_args(self, mock_original_put):
         """Test _safe_put with HumanMessage arguments that need serialization."""
         mock_original_put.return_value = "success"
@@ -119,7 +119,7 @@ class TestSqliteSaverMonkeypatch:
         assert isinstance(serialized_kwarg, dict)
         assert serialized_kwarg["type"] == "human"
 
-    @patch('backend.diagnostics.langgraph_patch._original_put')
+    @patch('backend.utils.langgraph_serialization._original_put')
     def test_safe_put_with_typeerror_first_attempt_then_success(self, mock_original_put):
         """Test _safe_put when first attempt fails but aggressive serialization succeeds."""
         # First call raises TypeError, second call succeeds
@@ -137,8 +137,8 @@ class TestSqliteSaverMonkeypatch:
         assert result == "success"
         assert mock_original_put.call_count == 2
 
-    @patch('backend.diagnostics.langgraph_patch._original_put')
-    @patch('backend.diagnostics.langgraph_patch.log')
+    @patch('backend.utils.langgraph_serialization._original_put')
+    @patch('backend.utils.langgraph_serialization.log')
     def test_safe_put_complete_failure_with_logging(self, mock_log, mock_original_put):
         """Test _safe_put when both attempts fail and proper logging occurs."""
         # Both attempts raise TypeError
@@ -167,7 +167,7 @@ class TestSqliteSaverMonkeypatch:
         """Test fallback to repr when serialize_deep fails."""
         # Create an object that will cause serialize_deep to raise an exception
         # We'll patch serialize_deep to raise an exception
-        with patch('backend.diagnostics.langgraph_patch.serialize_deep') as mock_serialize:
+        with patch('backend.utils.langgraph_serialization.serialize_deep') as mock_serialize:
             mock_serialize.side_effect = Exception("serialize_deep failed")
             
             class UnserializableObject:

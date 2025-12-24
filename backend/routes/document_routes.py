@@ -507,7 +507,6 @@ def get_document_details(document_id):
 
     if include_content:
         storage_service = current_app.config['STORAGE_SERVICE']
-        doc_ai_service = current_app.config.get('DOCAI_SERVICE') # Get DocAIService
 
         # Prioritize OCR'd content if available and status is 'processed'
         if doc.get('status') == 'processed_layout' and 'advanced_layout_gcs_uri' in doc:
