@@ -1,0 +1,9 @@
+Model: gemini-2.5-flash
+Execution Time: 1.875 seconds
+Prompt: Explain photosynthesis to a 10-year-old in 3 sentences.
+
+========================================
+Response:
+========================================
+
+Photosynthesis is how plants make their own food to grow big and strong. They use sunlight, water from their roots, and a gas from the air called carbon dioxide. Mixing these ingredients, plants create sugary food for themselves and release the oxygen we breathe!

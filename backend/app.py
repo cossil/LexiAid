@@ -319,7 +319,7 @@ except Exception as e:
 # have been removed as this logic is now handled by the SupervisorGraph.
 
 # --- WebSocket STT Endpoint ---
-@sock.route('/api/stt/stream')
+@sock.route('/ws/stt/stream')
 def stt_stream(ws):
     current_app.logger.info("WebSocket connection established for STT.")
     stt_service = current_app.config.get('SERVICES', {}).get('STTService')

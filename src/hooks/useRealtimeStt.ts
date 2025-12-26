@@ -32,6 +32,12 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   // Track active state via ref to avoid stale closures in cleanup
   const isRecordingRef = useRef(isRecording);
   isRecordingRef.current = isRecording;
+
+  // Keep a ref to stopRecording to avoid effect re-execution when function reference changes
+  const stopRecordingRef = useRef(stopRecording);
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
   
   // Cleanup on unmount to prevent memory leaks and locked microphone
   useEffect(() => {
@@ -49,11 +55,11 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
       
       // Stop recording if active (useAudioRecorder handles track cleanup)
       if (isRecordingRef.current) {
-        stopRecording();
+        stopRecordingRef.current();
         console.log('Recording stopped on unmount');
       }
     };
-  }, [stopRecording]);
+  }, []); // Empty dependency array ensures this ONLY runs on unmount
 
   const resolveBackendOrigin = () => {
     const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
@@ -73,7 +79,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
       const backendOrigin = resolveBackendOrigin();
       const wsProtocol = backendOrigin.startsWith('https') ? 'wss' : backendOrigin.startsWith('http') ? 'ws' : undefined;
       const normalizedOrigin = backendOrigin.replace(/^https?/, wsProtocol || 'ws');
-      const wsUrl = `${normalizedOrigin}/api/stt/stream`;
+      const wsUrl = `${normalizedOrigin}/ws/stt/stream`;
       console.log('Connecting to WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);

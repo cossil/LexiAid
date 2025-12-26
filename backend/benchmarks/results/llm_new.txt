@@ -1,0 +1,9 @@
+Model: gemini-3-flash-preview
+Execution Time: 2.335 seconds
+Prompt: Explain photosynthesis to a 10-year-old in 3 sentences.
+
+========================================
+Response:
+========================================
+
+Photosynthesis is the amazing way plants use sunlight, water, and air to make their own food. They turn these ingredients into a sugary energy that helps them grow big and strong. While making their food, plants also release oxygen into the air, which is exactly what humans and animals need to breathe!

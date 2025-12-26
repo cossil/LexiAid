@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface UseAudioRecorderReturn {
   isRecording: boolean;
@@ -20,7 +20,7 @@ const useAudioRecorder = (): UseAudioRecorderReturn => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const onChunkRef = useRef<(chunk: Blob) => void | null>(null);
+  const onChunkRef = useRef<((chunk: Blob) => void) | null>(null);
 
   // Clean up when component unmounts
   useEffect(() => {
@@ -34,7 +34,7 @@ const useAudioRecorder = (): UseAudioRecorderReturn => {
     };
   }, [audioUrl]);
 
-  const startRecording = async (options?: { onChunk?: (chunk: Blob) => void }) => {
+  const startRecording = useCallback(async (options?: { onChunk?: (chunk: Blob) => void }) => {
     try {
       setError(null);
       audioChunksRef.current = [];
@@ -94,10 +94,12 @@ const useAudioRecorder = (): UseAudioRecorderReturn => {
         streamRef.current = null;
       }
     }
-  };
+  }, []);
 
-  const stopRecording = (): Promise<Blob | null> => {
+  const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
+      // Use ref for mediaRecorder check to avoid dependency on isRecording if possible, 
+      // but keeping isRecording for logic consistency with state
       if (!mediaRecorderRef.current || !isRecording) {
         console.log('No active recording to stop');
         resolve(null);
@@ -180,16 +182,16 @@ const useAudioRecorder = (): UseAudioRecorderReturn => {
         resolve(null);
       }
     });
-  };
+  }, [isRecording]); // Depends on isRecording state
 
-  const clearAudio = () => {
+  const clearAudio = useCallback(() => {
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
     }
     setAudioBlob(null);
     audioChunksRef.current = [];
-  };
+  }, [audioUrl]);
 
   return {
     isRecording,
