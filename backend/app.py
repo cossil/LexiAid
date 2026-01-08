@@ -323,63 +323,15 @@ except Exception as e:
 def stt_stream(ws):
     current_app.logger.info("WebSocket connection established for STT.")
     stt_service = current_app.config.get('SERVICES', {}).get('STTService')
-    if not stt_service or not stt_service.client:
+    
+    if stt_service:
+        stt_service.handle_stt_stream(ws)
+    else:
         current_app.logger.error("STT Service not available, closing WebSocket.")
-        ws.close(reason=1011, message='STT service is not configured on the server.')
-        return
-
-    # 1. Set up the recognition config
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
-        sample_rate_hertz=16000,
-        language_code="en-US",
-        enable_automatic_punctuation=True,
-    )
-    streaming_config = speech.StreamingRecognitionConfig(
-        config=config, interim_results=True
-    )
-
-    # 2. Define the generator for the streaming request
-    def request_generator():
-        while True:
-            try:
-                message = ws.receive(timeout=10)
-                if message is None:
-                    continue
-                if isinstance(message, str):
-                    current_app.logger.info(f"Received string message: {message}")
-                    continue
-                yield speech.StreamingRecognizeRequest(audio_content=message)
-            except ConnectionClosed:
-                current_app.logger.info("Client connection closed in generator.")
-                break
-
-    try:
-        responses = stt_service.client.streaming_recognize(
-            config=streaming_config,
-            requests=request_generator(),
-        )
-
-        # 3. Process responses and send back to client
-        for response in responses:
-            if not response.results:
-                continue
-            result = response.results[0]
-            if not result.alternatives:
-                continue
-            transcript = result.alternatives[0].transcript
-            response_data = {
-                'is_final': result.is_final,
-                'transcript': transcript,
-                'stability': result.stability
-            }
-            ws.send(json.dumps(response_data))
-
-    except Exception as e:
-        current_app.logger.error(f"Error during STT stream: {e}")
-    finally:
-        ws.close()
-        current_app.logger.info("WebSocket connection closed.")
+        try:
+            ws.close(reason=1011, message='STT service is not configured on the server.')
+        except Exception as e:
+            current_app.logger.error(f"Error closing websocket: {e}")
 
 # --- Agent API Endpoint --- 
 @app.route('/api/v2/agent/chat', methods=['POST'])

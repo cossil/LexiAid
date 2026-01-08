@@ -1,6 +1,17 @@
 import React from 'react';
 import { Timepoint } from '../../types/document';
 
+// Helper function to decode HTML/XML entities that may have been escaped for TTS/SSML
+const decodeHtmlEntities = (text: string): string => {
+  if (!text) return text;
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+};
+
 const classNames = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(' ');
 
@@ -89,7 +100,7 @@ export const HighlightedTextBlock: React.FC<HighlightedTextBlockProps> = ({
                 )}
                 onClick={() => onWordClick?.(timepoint.time_seconds)}
               >
-                {timepoint.mark_name}{' '}
+                {decodeHtmlEntities(timepoint.mark_name)}{' '}
               </span>
             );
           })}

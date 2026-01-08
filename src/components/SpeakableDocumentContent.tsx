@@ -7,6 +7,17 @@ interface SpeakableDocumentContentProps {
   onWordClick: (timeInSeconds: number) => void;
 }
 
+// Helper function to decode HTML/XML entities that may have been escaped for TTS/SSML
+const decodeHtmlEntities = (text: string): string => {
+  if (!text) return text;
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+};
+
 export const SpeakableDocumentContent: React.FC<SpeakableDocumentContentProps> = ({
   wordTimepoints,
   activeTimepoint,
@@ -15,23 +26,23 @@ export const SpeakableDocumentContent: React.FC<SpeakableDocumentContentProps> =
 }) => {
   // Add comprehensive debugging
   console.log(`SpeakableDocumentContent: Received ${wordTimepoints ? wordTimepoints.length : 0} timepoints`);
-  
+
   if (wordTimepoints && wordTimepoints.length > 0) {
     // Log first and last few timepoints
     console.log('First 5 timepoints:', wordTimepoints.slice(0, 5));
     console.log('Last 5 timepoints:', wordTimepoints.slice(-5));
-    
+
     // Check for paragraph break markers
     const paragraphBreaks = wordTimepoints.filter(tp => tp && tp.mark_name === 'PARAGRAPH_BREAK');
     console.log(`Found ${paragraphBreaks.length} PARAGRAPH_BREAK markers in timepoints array`);
-    
+
     if (paragraphBreaks.length > 0) {
-      console.log('Paragraph break positions:', paragraphBreaks.map(pb => 
+      console.log('Paragraph break positions:', paragraphBreaks.map(pb =>
         `at ${pb.time_seconds.toFixed(2)}s (index ${wordTimepoints.indexOf(pb)}/${wordTimepoints.length})`
       ));
     }
   }
-  
+
   if (!wordTimepoints || wordTimepoints.length === 0) {
     return (
       <div className={`${className} text-center text-gray-500 p-8`}>
@@ -89,7 +100,7 @@ export const SpeakableDocumentContent: React.FC<SpeakableDocumentContentProps> =
                 className={`${isHighlighted ? 'bg-blue-300 dark:bg-blue-700 rounded-md' : 'bg-transparent'} cursor-pointer`}
                 onClick={() => onWordClick(timepoint.time_seconds)}
               >
-                {timepoint.mark_name}{' '}
+                {decodeHtmlEntities(timepoint.mark_name)}{' '}
               </span>
             );
           })}

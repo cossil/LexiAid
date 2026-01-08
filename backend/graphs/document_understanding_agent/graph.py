@@ -11,9 +11,9 @@ import mimetypes # For determining mimetype from file path
 # For loading .env file for local testing
 from dotenv import load_dotenv
 
-# Vertex AI SDK
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationConfig, HarmCategory, HarmBlockThreshold
+# Gemini API SDK (replaces Vertex AI for access to gemini-3-flash-preview)
+import google.generativeai as genai
+from google.cloud import storage  # For downloading GCS files
 
 # LangGraph
 from langgraph.graph import StateGraph, END
@@ -21,34 +21,27 @@ from langgraph.graph import StateGraph, END
 # State - use absolute import
 from backend.graphs.document_understanding_agent.state import DocumentUnderstandingState
 
-# --- Initialize Vertex AI ---
-# This section attempts to initialize Vertex AI.
-# If GOOGLE_CLOUD_PROJECT is not set, it logs a warning.
-# The __main__ block will attempt to load .env and re-initialize if needed for local testing.
-def initialize_vertex_ai():
-    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("GCP_LOCATION", "us-central1") # Default to us-central1 if not set
+# --- Initialize Gemini API ---
+def initialize_gemini_api():
+    """Initialize Gemini API with GOOGLE_API_KEY."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
     
-    if project_id:
+    if api_key:
         try:
-            vertexai.init(project=project_id, location=location)
-            logging.info(f"Vertex AI SDK initialized with project {project_id} and location {location}.")
+            genai.configure(api_key=api_key)
+            logging.info("Gemini API configured successfully with GOOGLE_API_KEY.")
             return True
         except Exception as e:
-            # Common to be "already initialized" if run multiple times or by a framework
-            if "already initialized" in str(e).lower():
-                logging.info(f"Vertex AI SDK was already initialized for project {project_id}.")
-                return True
-            logging.error(f"Error initializing Vertex AI SDK: {e}", exc_info=True)
+            logging.error(f"Error configuring Gemini API: {e}", exc_info=True)
             return False
     else:
-        logging.warning("Neither GOOGLE_CLOUD_PROJECT_ID nor GOOGLE_CLOUD_PROJECT environment variable set. Vertex AI SDK not initialized at module load.")
+        logging.warning("GOOGLE_API_KEY environment variable not set. Gemini API not configured.")
         return False
 
-VERTEX_AI_INITIALIZED = initialize_vertex_ai()
+GEMINI_API_INITIALIZED = initialize_gemini_api()
 
 # --- Constants ---
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-3-flash-preview")
 
 COMPREHENSIVE_LLM_PROMPT = """You are an advanced document analysis assistant. Your task is to analyze the provided document file, which may contain a mix of text, images, tables, and graphs/charts. Your goal is to produce a single, coherent, and detailed textual output that accurately represents the document's content as if you were meticulously reading it aloud for academic study by someone who cannot read the text visually, particularly a student with severe dyslexia. The output must be ready for clear and natural-sounding Text-to-Speech (TTS).
 
@@ -100,13 +93,41 @@ logger = logging.getLogger(__name__)
 if not logger.hasHandlers(): # Configure basic logging if no handlers are found
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+# --- Helper: Download file from GCS ---
+def download_gcs_file_to_bytes(gcs_uri: str) -> Optional[bytes]:
+    """Download a file from GCS and return its bytes."""
+    try:
+        # Parse gs://bucket/path format
+        if not gcs_uri.startswith("gs://"):
+            logger.error(f"Invalid GCS URI format: {gcs_uri}")
+            return None
+        
+        path_parts = gcs_uri[5:].split("/", 1)
+        if len(path_parts) < 2:
+            logger.error(f"Invalid GCS URI - missing path: {gcs_uri}")
+            return None
+        
+        bucket_name = path_parts[0]
+        blob_path = path_parts[1]
+        
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+        
+        file_bytes = blob.download_as_bytes()
+        logger.info(f"Downloaded {len(file_bytes)} bytes from GCS: {gcs_uri}")
+        return file_bytes
+    except Exception as e:
+        logger.error(f"Error downloading from GCS {gcs_uri}: {e}", exc_info=True)
+        return None
+
 # --- Agent Node ---
 def generate_tts_narrative_node(state: DocumentUnderstandingState) -> DocumentUnderstandingState:
     logger.info(f"[{datetime.now(timezone.utc)}] Entering generate_tts_narrative_node for doc: {state.get('document_id')}")
     state['error_message'] = None # Clear previous errors
 
-    if not VERTEX_AI_INITIALIZED: # Check if Vertex AI was initialized
-        state['error_message'] = "Vertex AI SDK not initialized. Cannot proceed with LLM call."
+    if not GEMINI_API_INITIALIZED:
+        state['error_message'] = "Gemini API not initialized. Ensure GOOGLE_API_KEY is set."
         logger.error(state['error_message'])
         return state
 
@@ -134,48 +155,62 @@ def generate_tts_narrative_node(state: DocumentUnderstandingState) -> DocumentUn
     logger.info(f"Processing document with mimetype: {input_mimetype}. Document ID: {state.get('document_id')}")
 
     try:
-        model = GenerativeModel(MODEL_NAME)
+        # Initialize the Gemini model
+        model = genai.GenerativeModel(MODEL_NAME)
         
-        document_part = None
+        # Get file bytes from various sources
+        file_bytes_content = None
+        
         if input_file_bytes:
-            logger.info(f"Using input_file_bytes (length: {len(input_file_bytes)}) for document part.")
-            document_part = Part.from_data(data=input_file_bytes, mime_type=input_mimetype)
+            logger.info(f"Using input_file_bytes (length: {len(input_file_bytes)}) for document.")
+            file_bytes_content = input_file_bytes
         elif input_file_path:
             if input_file_path.startswith("gs://"):
-                logger.info(f"Using GCS URI: {input_file_path} for document part.")
-                document_part = Part.from_uri(uri=input_file_path, mime_type=input_mimetype)
-            else: # Local file path
-                logger.info(f"Reading local file: {input_file_path} for document part.")
+                logger.info(f"Downloading from GCS: {input_file_path}")
+                file_bytes_content = download_gcs_file_to_bytes(input_file_path)
+                if not file_bytes_content:
+                    state['error_message'] = f"Failed to download file from GCS: {input_file_path}"
+                    logger.error(state['error_message'])
+                    return state
+            else:  # Local file path
+                logger.info(f"Reading local file: {input_file_path}")
                 with open(input_file_path, "rb") as f:
                     file_bytes_content = f.read()
-                document_part = Part.from_data(data=file_bytes_content, mime_type=input_mimetype)
         
-        if not document_part:
-            state['error_message'] = "Failed to create document part for LLM."
+        if not file_bytes_content:
+            state['error_message'] = "Failed to obtain file content for LLM."
             logger.error(state['error_message'])
             return state
 
-        generation_config = GenerationConfig(
-            temperature=0.2,
-            # max_output_tokens=8192, # Model default is usually sufficient
-        )
-        
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        # Create the file part for Gemini API (inline data)
+        # Using the blob format for multimodal content
+        file_data = {
+            "mime_type": input_mimetype,
+            "data": file_bytes_content
         }
 
-        logger.info(f"Sending request to Gemini model: {MODEL_NAME} with prompt and document part.")
-        response = model.generate_content(
-            [COMPREHENSIVE_LLM_PROMPT, document_part], # Swapped order: prompt first, then image
-            generation_config=generation_config,
-            safety_settings=safety_settings 
+        # Generation config
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.2,
         )
         
-        if response.candidates and response.candidates[0].content.parts:
-            tts_narrative = response.candidates[0].content.parts[0].text
+        # Safety settings for Gemini API
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+
+        logger.info(f"Sending request to Gemini model: {MODEL_NAME} with prompt and document.")
+        response = model.generate_content(
+            [COMPREHENSIVE_LLM_PROMPT, file_data],
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+        
+        if response.text:
+            tts_narrative = response.text
             state['tts_ready_narrative'] = tts_narrative
             logger.info(f"Successfully generated TTS narrative. Length: {len(tts_narrative)} chars.")
         else:
@@ -227,13 +262,13 @@ async def run_dua_processing_for_document(initial_state_dict: Dict[str, Any]) ->
 
     logger.info(f"Invoking DUA graph for document_id: {doc_id}")
     try:
-        # Ensure Vertex AI is initialized, especially if GOOGLE_CLOUD_PROJECT was set late
-        global VERTEX_AI_INITIALIZED
-        if not VERTEX_AI_INITIALIZED:
-            VERTEX_AI_INITIALIZED = initialize_vertex_ai() # Attempt re-initialization
+        # Ensure Gemini API is initialized
+        global GEMINI_API_INITIALIZED
+        if not GEMINI_API_INITIALIZED:
+            GEMINI_API_INITIALIZED = initialize_gemini_api()  # Attempt re-initialization
         
-        if not VERTEX_AI_INITIALIZED:
-            error_msg = "Vertex AI SDK could not be initialized. Cannot proceed."
+        if not GEMINI_API_INITIALIZED:
+            error_msg = "Gemini API could not be initialized. Ensure GOOGLE_API_KEY is set."
             logger.error(f"[{doc_id}] {error_msg}")
             return {"error_message": error_msg, "document_id": doc_id, "tts_ready_narrative": None}
 
@@ -334,30 +369,29 @@ if __name__ == '__main__':
         logger.info(f"[__main__] .env file found at {dotenv_path}. Attempting to load.")
         load_dotenv(dotenv_path)
         logger.info(f"[__main__] Finished attempt to load .env from {dotenv_path}.")
-        logger.info(f"[__main__] GOOGLE_CLOUD_PROJECT_ID after load_dotenv: '{os.environ.get('GOOGLE_CLOUD_PROJECT_ID')}'")
-        logger.info(f"[__main__] GOOGLE_CLOUD_PROJECT after load_dotenv: '{os.environ.get('GOOGLE_CLOUD_PROJECT')}'")
-        # After loading .env, re-attempt Vertex AI initialization if it failed earlier
-        if not VERTEX_AI_INITIALIZED:
-            logger.info("Attempting Vertex AI initialization after .env load...")
-            VERTEX_AI_INITIALIZED = initialize_vertex_ai()
+        logger.info(f"[__main__] GOOGLE_API_KEY after load_dotenv: '{os.environ.get('GOOGLE_API_KEY', '')[:10]}...'")
+        # After loading .env, re-attempt Gemini API initialization if it failed earlier
+        if not GEMINI_API_INITIALIZED:
+            logger.info("Attempting Gemini API initialization after .env load...")
+            GEMINI_API_INITIALIZED = initialize_gemini_api()
     else:
-        logger.warning(f"[__main__] .env file NOT found at {dotenv_path}. Ensure GOOGLE_CLOUD_PROJECT_ID or GOOGLE_CLOUD_PROJECT is set in your environment or in the .env file at this path.")
+        logger.warning(f"[__main__] .env file NOT found at {dotenv_path}. Ensure GOOGLE_API_KEY is set in your environment or in the .env file at this path.")
 
-    # Critical check for GOOGLE_CLOUD_PROJECT after attempting .env load
-    project_id_env = os.environ.get("GOOGLE_CLOUD_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
-    if not project_id_env:
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        logger.error("ERROR: Neither GOOGLE_CLOUD_PROJECT_ID nor GOOGLE_CLOUD_PROJECT environment variable is SET.")
-        logger.error("Please set one of them in your .env file (e.g., C:\\Ai\\aitutor_37\\backend\\.env)")
+    # Critical check for GOOGLE_API_KEY after attempting .env load
+    api_key_env = os.environ.get("GOOGLE_API_KEY")
+    if not api_key_env:
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.error("ERROR: GOOGLE_API_KEY environment variable is NOT SET.")
+        logger.error("Please set it in your .env file (e.g., C:\\Ai\\aitutor_37\\backend\\.env)")
         logger.error("or as a system environment variable.")
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        sys.exit(1) # Exit if project ID is crucial and not found
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        sys.exit(1)
     
-    if not VERTEX_AI_INITIALIZED:
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        logger.error("ERROR: Vertex AI SDK could not be initialized. Check logs for details.")
-        logger.error("Ensure GOOGLE_CLOUD_PROJECT_ID or GOOGLE_CLOUD_PROJECT is correctly set and you have authenticated.")
-        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    if not GEMINI_API_INITIALIZED:
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.error("ERROR: Gemini API could not be initialized. Check logs for details.")
+        logger.error("Ensure GOOGLE_API_KEY is correctly set.")
+        logger.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         sys.exit(1)
 
     # --- Test Image Path --- 

@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 import logging
 import traceback
 import datetime
+from simple_websocket import ConnectionClosed
+import json
 
 # Load environment variables
 load_dotenv()
@@ -462,3 +464,107 @@ class STTService:
         except Exception as e:
             print(f"Error getting supported languages: {e}")
             return False, None
+
+    def handle_stt_stream(self, ws):
+        """
+        Handle a WebSocket connection for streaming Speech-to-Text.
+        
+        Args:
+            ws: The WebSocket connection object from flask-sock.
+        """
+        # Create a logger if it doesn't exist on the instance (though _initialize usually does it)
+        logger = self.logger if hasattr(self, 'logger') and self.logger else logging.getLogger("STTService")
+        
+        logger.info("Handling STT stream in STTService.")
+        
+        if not self._check_client():
+            logger.error("STT Client not available, closing WebSocket.")
+            ws.close(reason=1011, message='STT service is not configured on the server.')
+            return
+
+        # 1. Set up the recognition config
+        # We use WEBM_OPUS as it's common for web-based audio streaming (e.g. from browsers)
+        # Adjust sample rate if necessary, but 16000 or 48000 is typical. 
+        # Ideally, we might want to let the client negotiate this, but fixed for now based on app.py logic.
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+            sample_rate_hertz=16000,
+            language_code="en-US",
+            enable_automatic_punctuation=True,
+        )
+        streaming_config = speech.StreamingRecognitionConfig(
+            config=config, interim_results=True
+        )
+
+        # 2. Define the generator for the streaming request
+        def request_generator():
+            while True:
+                try:
+                    # Receive data from the WebSocket
+                    # timeout=10 was in app.py, keeping it.
+                    message = ws.receive(timeout=10)
+                    
+                    if message is None:
+                        # None usually means connection closed cleanly or no data
+                        continue
+                    
+                    if isinstance(message, str):
+                        # Control messages or text data (unexpected for pure audio stream but possible)
+                        logger.info(f"Received string message: {message}")
+                        if message == 'CLOSE': # Example control
+                             break
+                        continue
+                    
+                    # Yield audio content
+                    yield speech.StreamingRecognizeRequest(audio_content=message)
+                    
+                except ConnectionClosed:
+                    logger.info("Client connection closed in generator.")
+                    break
+                except Exception as e:
+                    logger.error(f"Error receiving from websocket: {e}")
+                    break
+
+        try:
+            # Start streaming recognition
+            responses = self.client.streaming_recognize(
+                config=streaming_config,
+                requests=request_generator(),
+            )
+
+            # 3. Process responses and send back to client
+            for response in responses:
+                if not response.results:
+                    continue
+                
+                result = response.results[0]
+                if not result.alternatives:
+                    continue
+                
+                transcript = result.alternatives[0].transcript
+                
+                response_data = {
+                    'is_final': result.is_final,
+                    'transcript': transcript,
+                    'stability': result.stability
+                }
+                
+                try:
+                    ws.send(json.dumps(response_data))
+                except ConnectionClosed:
+                    logger.info("Client connection closed while sending response.")
+                    break
+                except Exception as e:
+                    logger.error(f"Error sending response to websocket: {e}")
+                    break
+
+        except Exception as e:
+            logger.error(f"Error during STT stream processing: {e}")
+            # Optional: send error message to client if possible
+        finally:
+            # Ensure connection is closed
+            try:
+                ws.close()
+            except:
+                pass
+            logger.info("WebSocket connection closed in STTService.")

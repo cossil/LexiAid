@@ -6,7 +6,6 @@ python-dotenv==1.1.0
 # Flask Extensions
 flask-cors==5.0.1
 flask-jwt-extended==4.7.1
-flask-socketio==5.5.1
 flask-sqlalchemy==3.1.1
 alembic==1.16.1
 
@@ -57,8 +56,6 @@ pytest-mock==3.14.1
 pytest-asyncio==1.0.0
 
 # Runtime Dependencies
-python-engineio==4.12.1
-python-socketio==5.13.0
 pyjwt[crypto]==2.10.1
 
 gunicorn
