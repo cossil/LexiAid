@@ -49,7 +49,7 @@ Your task: Refine this into a clear, well-structured answer.
     # Initialize LLM
     api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-3-flash-preview",
         temperature=0.3,
         google_api_key=api_key
     )
@@ -198,7 +198,7 @@ def generate_markdown_report(results):
         f.write("# Refinement Prompt Fidelity Test Report\n\n")
         f.write(f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write(f"**Prompt Tested**: REFINEMENT_SYSTEM_PROMPT\n\n")
-        f.write(f"**Model**: gemini-2.5-flash (temperature=0.3)\n\n")
+        f.write(f"**Model**: gemini-3-flash-preview (temperature=0.3)\n\n")
         f.write("---\n\n")
         f.write("## Test Results\n\n")
         

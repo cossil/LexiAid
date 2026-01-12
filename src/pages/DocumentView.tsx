@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
+import {
   ChevronLeft,
-  Download, 
-  FileText, 
-  MessageSquare, 
-  StopCircle, 
-  Play, 
+  Download,
+  FileText,
+  MessageSquare,
+  StopCircle,
+  Play,
   Pause,
   Loader2 as Loader,
   Layers,
@@ -81,7 +81,7 @@ const DocumentView: React.FC = () => {
       try {
         const token = await getAuthToken();
         if (!token) throw new Error('Authentication token not available');
-        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8081';
+        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
         const response = await axios.get(`${apiUrl}/api/documents/${id}?include_content=true`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -119,7 +119,7 @@ const DocumentView: React.FC = () => {
     try {
       const token = await getAuthToken();
       if (!token) throw new Error('Authentication token not available');
-      const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8081';
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
       const response = await axios.get(`${apiUrl}/api/documents/${id}/download`, {
         headers: { 'Authorization': `Bearer ${token}` },
         responseType: 'blob',
@@ -163,13 +163,13 @@ const DocumentView: React.FC = () => {
         return (
           <div className="p-6 h-full flex flex-col items-center justify-center">
             <MessageSquare className={`h-16 w-16 mb-4 ${highContrast ? 'text-white' : 'text-blue-400'}`} />
-            <h2 
+            <h2
               className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}
               onMouseEnter={() => handleHover('Ask Questions')}
             >
               Ask Questions
             </h2>
-            <p 
+            <p
               className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
               onMouseEnter={() => handleHover('Chat with LexiAid about this document to get summaries or explanations.')}
             >
@@ -188,13 +188,13 @@ const DocumentView: React.FC = () => {
         return (
           <div className="p-6 h-full flex flex-col items-center justify-center">
             <Layers className={`h-16 w-16 mb-4 ${highContrast ? 'text-white' : 'text-green-400'}`} />
-            <h2 
+            <h2
               className={`text-xl font-semibold mb-2 ${highContrast ? 'text-white' : 'text-white'}`}
               onMouseEnter={() => handleHover('Test Your Knowledge')}
             >
               Test Your Knowledge
             </h2>
-            <p 
+            <p
               className={`text-center max-w-lg mb-6 ${highContrast ? 'text-gray-200' : 'text-gray-300'}`}
               onMouseEnter={() => handleHover('Generate quizzes based on this document to test your understanding.')}
             >
@@ -230,7 +230,7 @@ const DocumentView: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button onClick={() => setShowSettings(!showSettings)} className={`p-2 rounded-md ${highContrast ? 'bg-gray-700' : 'bg-gray-600'} text-white`} onMouseEnter={() => handleHover('Accessibility Settings')}> <Settings className="h-5 w-5" /> </button>
             <button onClick={handleDownload} className={`p-2 rounded-md ${highContrast ? 'bg-gray-700' : 'bg-gray-600'} text-white`} onMouseEnter={() => handleHover('Download document')}> <Download className="h-5 w-5" /> </button>
-            <button onClick={playAudio} disabled={status === 'loading' || !document?.content} className={`px-4 py-2 rounded-md flex items-center justify-center transition-colors duration-200 ${status === 'loading' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`} onMouseEnter={() => handleHover(getButtonLabel())}>
+            <button onClick={() => playAudio()} disabled={status === 'loading' || !document?.content} className={`px-4 py-2 rounded-md flex items-center justify-center transition-colors duration-200 ${status === 'loading' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`} onMouseEnter={() => handleHover(getButtonLabel())}>
               {status === 'loading' ? <Loader className="h-5 w-5 animate-spin" /> : status === 'playing' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               <span className="ml-2">{getButtonLabel()}</span>
             </button>
@@ -244,7 +244,7 @@ const DocumentView: React.FC = () => {
         </div>
         {showSettings && (
           <div className={`mb-6 p-4 rounded-lg ${highContrast ? 'bg-gray-800' : 'bg-gray-700'}`}>
-            <h2 
+            <h2
               className={`text-lg font-semibold mb-3 ${highContrast ? 'text-white' : 'text-white'}`}
               onMouseEnter={() => handleHover('Reading Settings')}
             >
@@ -252,8 +252,8 @@ const DocumentView: React.FC = () => {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label 
-                  htmlFor="font-size" 
+                <label
+                  htmlFor="font-size"
                   className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}
                   onMouseEnter={() => handleHover(`Font Size: ${fontSize} pixels`)}
                 >
@@ -262,8 +262,8 @@ const DocumentView: React.FC = () => {
                 <input id="font-size" type="range" min="12" max="28" step="1" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="w-full" />
               </div>
               <div>
-                <label 
-                  htmlFor="line-spacing" 
+                <label
+                  htmlFor="line-spacing"
                   className={`block text-sm font-medium mb-1 ${highContrast ? 'text-white' : 'text-gray-300'}`}
                   onMouseEnter={() => handleHover(`Line Spacing: ${lineSpacing}`)}
                 >

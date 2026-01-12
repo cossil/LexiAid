@@ -4,25 +4,6 @@ Text-to-Speech Service for AI Tutor Application
 This module provides a wrapper around Google Cloud Text-to-Speech
 for converting text to speech audio.
 """
-# START DIAGNOSTIC CODE
-import sys
-print("--- DIAGNOSTIC: START ---")
-print("Python Executable:", sys.executable)
-print("System Path:")
-for path in sys.path:
-    print(f"  - {path}")
-
-try:
-    import google.cloud.texttospeech as tts
-    print("Successfully imported google.cloud.texttospeech")
-    print("Module location:", tts.__file__)
-except ImportError as e:
-    print("Failed to import google.cloud.texttospeech:", e)
-except Exception as e:
-    print("An unexpected error occurred during import:", e)
-
-print("--- DIAGNOSTIC: END ---")
-# END DIAGNOSTIC CODE
 
 
 import io
@@ -68,13 +49,13 @@ class TTSService:
         
         if not self.project_id or not self.service_account_key_path:
             msg = "WARNING: Missing required environment variables (GCP_PROJECT_ID or FIREBASE_SERVICE_ACCOUNT_KEY_PATH) for Text-to-Speech"
-            print(msg)
+            logging.warning(msg)
             # self.client will remain None
             raise TTSServiceError(msg)
             
         if not os.path.exists(self.service_account_key_path):
             msg = f"WARNING: Service account file not found at: {self.service_account_key_path}"
-            print(msg)
+            logging.warning(msg)
             # self.client will remain None
             raise TTSServiceError(msg)
         
@@ -86,17 +67,17 @@ class TTSService:
             
             # Initialize Text-to-Speech client with explicit credentials
             self.client = texttospeech.TextToSpeechClient(credentials=credentials)
-            print("Text-to-Speech client initialized successfully.")
+            logging.info("Text-to-Speech client initialized successfully.")
         except Exception as e:
             msg = f"ERROR: Failed to initialize Text-to-Speech client: {e}"
-            print(msg)
+            logging.error(msg)
             # self.client will remain None
             raise TTSServiceError(msg)
     
     def _check_client(self):
         """Helper to check if the client is initialized."""
         if not self.client:
-            print("ERROR: Text-to-Speech client not initialized.")
+            logging.error("Text-to-Speech client not initialized.")
             return False
         return True
     
@@ -255,7 +236,7 @@ class TTSService:
             final_speaking_rate = float(speaking_rate) if speaking_rate is not None else float(os.getenv('TTS_DEFAULT_SPEAKING_RATE', 1.0))
             final_pitch = float(pitch) if pitch is not None else float(os.getenv('TTS_DEFAULT_PITCH', 0.0))
         except (ValueError, TypeError):
-            print("WARNING: Invalid speaking rate or pitch, using defaults.")
+            logging.warning("Invalid speaking rate or pitch, using defaults.")
             final_speaking_rate = 1.0
             final_pitch = 0.0
         
@@ -377,7 +358,7 @@ class TTSService:
         
         try:
             for chunk_index, chunk in enumerate(chunks):
-                print(f"Processing chunk {chunk_index+1}/{len(chunks)} ({len(chunk)} characters)")
+                logging.info(f"Processing TTS chunk {chunk_index+1}/{len(chunks)} ({len(chunk)} characters)")
                 logging.debug(f"TTS_TRACE: [Chunk {chunk_index+1}/{len(chunks)}] Processing chunk with {len(chunk)} characters")
                 
                 # Build SSML and mark map for this chunk
@@ -467,7 +448,7 @@ class TTSService:
             buffer.seek(0)
             final_audio_bytes = buffer.getvalue()
             
-            print(f"TTS successfully synthesized {len(final_audio_bytes)} bytes with {len(timepoint_chunks)} timepoints across {len(chunks)} chunks.")
+            logging.info(f"TTS successfully synthesized {len(final_audio_bytes)} bytes with {len(timepoint_chunks)} timepoints across {len(chunks)} chunks.")
             logging.debug(
                 f"TTS_TRACE: Exiting synthesize_text. Processed {len(chunks)} chunks. Total audio size: {len(final_audio_bytes)} bytes. "
                 f"Total timepoints: {len(timepoint_chunks)}"
@@ -478,7 +459,7 @@ class TTSService:
                 "timepoints": timepoint_chunks
             }
         except Exception as e:
-            print(f"Error synthesizing speech: {e}")
+            logging.error(f"Error synthesizing speech: {e}")
             return None
 
     def get_available_voices(self, language_code=None):
@@ -511,5 +492,5 @@ class TTSService:
             
             return voices
         except Exception as e:
-            print(f"Error retrieving available voices: {e}")
+            logging.error(f"Error retrieving available voices: {e}")
             return None

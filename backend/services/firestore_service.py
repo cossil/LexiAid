@@ -189,9 +189,11 @@ class FirestoreService:
         doc = doc_ref.get()
         
         if doc.exists:
+            # print(f"DEBUG: ensure_user_profile - User {user_id} already exists.")
             return False
             
         # Profile doesn't exist, create it
+        print(f"DEBUG: ensure_user_profile - Creating NEW profile for {user_id}")
         user_data = {
             'email': email,
             'displayName': display_name

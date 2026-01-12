@@ -75,7 +75,8 @@ def call_chat_llm_node(state: GeneralQueryState) -> Dict[str, Any]:
 
     try:
         # 1. Instantiate LLM Client
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+        model_name = os.getenv("LLM_MODEL_NAME", "gemini-3-flash-preview")
+        llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.7)
 
         # 2. Load Document Narrative
         document_narrative = "Placeholder document narrative. Replace with actual retrieval."

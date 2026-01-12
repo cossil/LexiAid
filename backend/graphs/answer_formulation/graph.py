@@ -127,7 +127,7 @@ Your task: Refine this into a clear, well-structured answer.
     try:
         # Initialize LLM with lower temperature for consistent refinement
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             temperature=0.3  # Lower temp for more faithful refinement
         )
         
@@ -208,7 +208,7 @@ Apply this edit to the answer. Only change what was requested.
     try:
         # Initialize LLM with very low temperature for precise edits
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             temperature=0.2  # Very low for precise, minimal edits
         )
         
@@ -300,7 +300,7 @@ Task: Identify any information in the Refined Answer that was NOT present in the
     try:
         # Initialize LLM with very low temperature for consistent validation
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             temperature=0.1  # Very low for consistent, strict validation
         )
         

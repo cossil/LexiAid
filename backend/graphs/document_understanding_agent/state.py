@@ -2,6 +2,8 @@ from typing import TypedDict, Optional, List, Dict, Any
 
 class DocumentUnderstandingState(TypedDict):
     document_id: str
+    user_id: Optional[str]  # Firebase Auth UID for profile lookup
+    visual_impairment: Optional[bool]  # User's visual impairment status from profile
     original_gcs_uri: str # GCS URI of the original uploaded document
     # raw_layout_gcs_uri: str # GCS URI of the raw JSON from AdvancedDocumentLayoutTool - May not be needed if we pass file directly
     

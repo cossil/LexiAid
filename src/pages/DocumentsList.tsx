@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FileText, 
-  Upload, 
-  Search, 
-  ChevronRight, 
-  Calendar, 
+import {
+  FileText,
+  Upload,
+  Search,
+  ChevronRight,
+  Calendar,
   AlertCircle,
   Loader,
   Folder,
@@ -51,20 +51,20 @@ const DocumentsList: React.FC = () => {
   useEffect(() => {
     const fetchDocuments = async () => {
       if (!currentUser) return;
-      
+
       try {
         setLoading(true);
-        
+
         // Get user's Firebase ID token
         const token = await currentUser.getIdToken();
-        
+
         if (!token) {
           throw new Error('Authentication token not available');
         }
 
         // Get the backend API URL from environment variables
-        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-        
+        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
+
         // Fetch documents
         const response = await axios.get(`${apiUrl}/api/documents`, {
           headers: {
@@ -85,8 +85,8 @@ const DocumentsList: React.FC = () => {
   }, [currentUser]);
 
   // Filter documents based on search query
-  const filteredDocuments = documents.filter(doc => 
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredDocuments = documents.filter(doc =>
+    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     doc.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -97,7 +97,7 @@ const DocumentsList: React.FC = () => {
       const dateB = new Date(sortOrder === 'asc' ? b.created_at : a.created_at).getTime();
       return dateA - dateB;
     } else if (sortBy === 'name') {
-      return sortOrder === 'asc' 
+      return sortOrder === 'asc'
         ? a.name.localeCompare(b.name)
         : b.name.localeCompare(a.name);
     } else { // type
@@ -119,7 +119,7 @@ const DocumentsList: React.FC = () => {
 
   // Get appropriate icon for file type
   const getFileTypeIcon = (fileType: string) => {
-    switch(fileType.toLowerCase()) {
+    switch (fileType.toLowerCase()) {
       case 'pdf':
         return <FileText className={highContrast ? "text-white" : "text-red-400"} />;
       case 'png':
@@ -154,8 +154,8 @@ const DocumentsList: React.FC = () => {
       if (!token) {
         throw new Error('Authentication token not available');
       }
-      const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-      
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
+
       await axios.delete(`${apiUrl}/api/documents/${documentToDelete}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -205,35 +205,33 @@ const DocumentsList: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 
+        <h1
           className={`text-2xl font-bold ${highContrast ? 'text-white' : 'text-white'}`}
           onMouseEnter={() => handleHover('My Documents')}
         >
           My Documents
         </h1>
-        
+
         <div className="flex space-x-3">
-          <Link 
+          <Link
             to="/dashboard/upload"
             state={{ initialTab: 'text' }}
-            className={`flex items-center px-4 py-2 rounded-md border ${
-              highContrast 
-                ? 'border-white text-white hover:bg-gray-800' 
+            className={`flex items-center px-4 py-2 rounded-md border ${highContrast
+                ? 'border-white text-white hover:bg-gray-800'
                 : 'border-blue-600 text-blue-400 hover:bg-blue-900/30'
-            } transition-colors duration-200`}
+              } transition-colors duration-200`}
             onMouseEnter={() => handleHover('Create a new document from text')}
           >
             <FileText className="h-4 w-4 mr-2" aria-hidden="true" />
             Paste Text
           </Link>
-          
-          <Link 
+
+          <Link
             to="/dashboard/upload"
-            className={`flex items-center px-4 py-2 rounded-md ${
-              highContrast 
-                ? 'bg-white text-black hover:bg-gray-200' 
+            className={`flex items-center px-4 py-2 rounded-md ${highContrast
+                ? 'bg-white text-black hover:bg-gray-200'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
-            } transition-colors duration-200`}
+              } transition-colors duration-200`}
             onMouseEnter={() => handleHover('Upload New Document')}
           >
             <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -254,27 +252,25 @@ const DocumentsList: React.FC = () => {
               placeholder="Search documents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`pl-10 pr-4 py-2 w-full rounded-md ${
-                highContrast 
-                  ? 'bg-black border border-white text-white placeholder-gray-400' 
+              className={`pl-10 pr-4 py-2 w-full rounded-md ${highContrast
+                  ? 'bg-black border border-white text-white placeholder-gray-400'
                   : 'bg-gray-700 border border-gray-600 text-white placeholder-gray-400'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               aria-label="Search documents"
             />
           </div>
-          
+
           <div className="flex space-x-2">
             <button
               onClick={() => handleSortChange('date')}
-              className={`px-3 py-2 rounded-md flex items-center ${
-                sortBy === 'date'
-                  ? highContrast 
-                    ? 'bg-white text-black' 
+              className={`px-3 py-2 rounded-md flex items-center ${sortBy === 'date'
+                  ? highContrast
+                    ? 'bg-white text-black'
                     : 'bg-blue-600 text-white'
-                  : highContrast 
-                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800' 
+                  : highContrast
+                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              } transition-colors duration-200`}
+                } transition-colors duration-200`}
               aria-pressed={sortBy === 'date'}
               onMouseEnter={() => handleHover('Sort by date')}
             >
@@ -284,18 +280,17 @@ const DocumentsList: React.FC = () => {
                 <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
               )}
             </button>
-            
+
             <button
               onClick={() => handleSortChange('name')}
-              className={`px-3 py-2 rounded-md flex items-center ${
-                sortBy === 'name'
-                  ? highContrast 
-                    ? 'bg-white text-black' 
+              className={`px-3 py-2 rounded-md flex items-center ${sortBy === 'name'
+                  ? highContrast
+                    ? 'bg-white text-black'
                     : 'bg-blue-600 text-white'
-                  : highContrast 
-                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800' 
+                  : highContrast
+                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              } transition-colors duration-200`}
+                } transition-colors duration-200`}
               aria-pressed={sortBy === 'name'}
               onMouseEnter={() => handleHover('Sort by name')}
             >
@@ -305,18 +300,17 @@ const DocumentsList: React.FC = () => {
                 <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
               )}
             </button>
-            
+
             <button
               onClick={() => handleSortChange('type')}
-              className={`px-3 py-2 rounded-md flex items-center ${
-                sortBy === 'type'
-                  ? highContrast 
-                    ? 'bg-white text-black' 
+              className={`px-3 py-2 rounded-md flex items-center ${sortBy === 'type'
+                  ? highContrast
+                    ? 'bg-white text-black'
                     : 'bg-blue-600 text-white'
-                  : highContrast 
-                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800' 
+                  : highContrast
+                    ? 'bg-gray-900 border border-white text-white hover:bg-gray-800'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              } transition-colors duration-200`}
+                } transition-colors duration-200`}
               aria-pressed={sortBy === 'type'}
               onMouseEnter={() => handleHover('Sort by file type')}
             >
@@ -342,9 +336,8 @@ const DocumentsList: React.FC = () => {
           <p className={`text-lg mb-2 ${highContrast ? 'text-white' : 'text-gray-300'}`}>{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className={`px-4 py-2 mt-4 rounded-md ${
-              highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
-            } transition-colors duration-200`}
+            className={`px-4 py-2 mt-4 rounded-md ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
+              } transition-colors duration-200`}
           >
             Try Again
           </button>
@@ -358,9 +351,8 @@ const DocumentsList: React.FC = () => {
               </p>
               <button
                 onClick={() => setSearchQuery('')}
-                className={`px-4 py-2 rounded-md ${
-                  highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
-                } transition-colors duration-200`}
+                className={`px-4 py-2 rounded-md ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
+                  } transition-colors duration-200`}
               >
                 Clear Search
               </button>
@@ -370,11 +362,10 @@ const DocumentsList: React.FC = () => {
               <p className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}>
                 You haven't uploaded any documents yet.
               </p>
-              <Link 
-                to="/dashboard/upload" 
-                className={`inline-flex items-center px-4 py-2 rounded-md ${
-                  highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
-                } font-medium transition-colors duration-200`}
+              <Link
+                to="/dashboard/upload"
+                className={`inline-flex items-center px-4 py-2 rounded-md ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
+                  } font-medium transition-colors duration-200`}
                 onMouseEnter={() => handleHover('Upload your first document')}
               >
                 <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -389,11 +380,10 @@ const DocumentsList: React.FC = () => {
             <Link
               key={doc.id}
               to={`/dashboard/documents/${doc.id}`}
-              className={`block p-4 rounded-lg ${
-                highContrast 
-                  ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+              className={`block p-4 rounded-lg ${highContrast
+                  ? 'bg-gray-900 border border-white hover:bg-gray-800'
                   : 'bg-gray-800/50 hover:bg-gray-700/50'
-              } transition-colors duration-200`}
+                } transition-colors duration-200`}
               onMouseEnter={() => handleHover(doc.name)}
             >
               <div className="flex items-center justify-between">
@@ -401,23 +391,23 @@ const DocumentsList: React.FC = () => {
                   <div className={`p-3 rounded-md mr-4 ${highContrast ? 'bg-black' : 'bg-gray-700'}`}>
                     {getFileTypeIcon(doc.file_type)}
                   </div>
-                  
+
                   <div>
                     <h2 className={`text-lg font-medium ${highContrast ? 'text-white' : 'text-white'} mb-1`}>
                       {doc.name}
                     </h2>
-                    
+
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                       <span className={`flex items-center text-xs ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
                         <Calendar className="h-3 w-3 mr-1" aria-hidden="true" />
                         {formatDate(doc.created_at)}
                       </span>
-                      
+
                       <span className={`flex items-center text-xs ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
                         <FileText className="h-3 w-3 mr-1" aria-hidden="true" />
                         {doc.file_type.toUpperCase()}
                       </span>
-                      
+
                       <span className={`flex items-center text-xs ${highContrast ? 'text-gray-300' : 'text-gray-400'}`}>
                         <Clock className="h-3 w-3 mr-1" aria-hidden="true" />
                         {Math.round(doc.content_length / 1000)}K characters
@@ -425,27 +415,27 @@ const DocumentsList: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center">
                   {doc.processing_status === 'pending' && (
                     <span className="text-xs bg-yellow-700/30 text-yellow-300 px-2 py-1 rounded mr-2">
                       Processing
                     </span>
                   )}
-                  
+
                   {doc.processing_status === 'completed' && (
                     <span className="text-xs bg-green-700/30 text-green-300 px-2 py-1 rounded mr-2">
                       Ready
                     </span>
                   )}
-                  
+
                   {doc.processing_status === 'error' && (
                     <span className="text-xs bg-red-700/30 text-red-300 px-2 py-1 rounded mr-2">
                       Error
                     </span>
                   )}
-                  
-                  <ChevronRight 
+
+                  <ChevronRight
                     className={`h-5 w-5 ${highContrast ? 'text-white' : 'text-gray-400'}`}
                     aria-hidden="true"
                   />
@@ -455,11 +445,10 @@ const DocumentsList: React.FC = () => {
                       e.stopPropagation(); // Stop event bubbling
                       handleDeleteClick(doc.id);
                     }}
-                    className={`p-1.5 rounded-full transition-colors duration-200 ${ 
-                      highContrast 
-                      ? 'text-red-400 hover:bg-red-700 hover:text-white focus:bg-red-700 focus:text-white' 
-                      : 'text-gray-400 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-700 dark:hover:text-white focus:bg-red-100 focus:text-red-500'
-                    }`}
+                    className={`p-1.5 rounded-full transition-colors duration-200 ${highContrast
+                        ? 'text-red-400 hover:bg-red-700 hover:text-white focus:bg-red-700 focus:text-white'
+                        : 'text-gray-400 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-700 dark:hover:text-white focus:bg-red-100 focus:text-red-500'
+                      }`}
                     aria-label="Delete document"
                     onMouseEnter={() => handleHover('Delete this document')}
                     title="Delete Document"
@@ -486,22 +475,20 @@ const DocumentsList: React.FC = () => {
             <div className="flex justify-end space-x-3">
               <button
                 onClick={cancelDelete}
-                className={`px-4 py-2 rounded-md font-medium ${ 
-                  highContrast 
-                  ? 'bg-gray-600 text-white hover:bg-gray-500 focus:ring-2 focus:ring-gray-400' 
-                  : 'bg-gray-600 text-white hover:bg-gray-500 focus:ring-2 focus:ring-gray-500'
-                } transition-colors`}
+                className={`px-4 py-2 rounded-md font-medium ${highContrast
+                    ? 'bg-gray-600 text-white hover:bg-gray-500 focus:ring-2 focus:ring-gray-400'
+                    : 'bg-gray-600 text-white hover:bg-gray-500 focus:ring-2 focus:ring-gray-500'
+                  } transition-colors`}
                 onMouseEnter={() => handleHover('Cancel deletion')}
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className={`px-4 py-2 rounded-md font-medium ${ 
-                  highContrast 
-                  ? 'bg-red-500 text-white hover:bg-red-400 focus:ring-2 focus:ring-red-300' 
-                  : 'bg-red-600 text-white hover:bg-red-500 focus:ring-2 focus:ring-red-500'
-                } transition-colors`}
+                className={`px-4 py-2 rounded-md font-medium ${highContrast
+                    ? 'bg-red-500 text-white hover:bg-red-400 focus:ring-2 focus:ring-red-300'
+                    : 'bg-red-600 text-white hover:bg-red-500 focus:ring-2 focus:ring-red-500'
+                  } transition-colors`}
                 onMouseEnter={() => handleHover('Confirm delete document')}
               >
                 Delete

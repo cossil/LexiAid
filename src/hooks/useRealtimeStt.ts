@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
 import useAudioRecorder from './useAudioRecorder';
 
 export type SttStatus = 'idle' | 'requesting_permission' | 'dictating' | 'review' | 'connecting';
@@ -28,7 +29,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   const wsRef = useRef<WebSocket | null>(null);
   const manualStopRef = useRef<boolean>(false);
   const { startRecording, stopRecording, isRecording } = useAudioRecorder();
-  
+
   // Track active state via ref to avoid stale closures in cleanup
   const isRecordingRef = useRef(isRecording);
   isRecordingRef.current = isRecording;
@@ -38,7 +39,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   useEffect(() => {
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
-  
+
   // Cleanup on unmount to prevent memory leaks and locked microphone
   useEffect(() => {
     return () => {
@@ -52,7 +53,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
         }
         wsRef.current = null;
       }
-      
+
       // Stop recording if active (useAudioRecorder handles track cleanup)
       if (isRecordingRef.current) {
         stopRecordingRef.current();
@@ -62,7 +63,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   }, []); // Empty dependency array ensures this ONLY runs on unmount
 
   const resolveBackendOrigin = () => {
-    const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+    const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
     const rawBase = import.meta.env.VITE_BACKEND_API_URL || fallback;
     try {
       const base = new URL(rawBase);
@@ -74,13 +75,36 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
   };
 
   const connectWebSocket = useCallback(() => {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>(async (resolve, reject) => {
+      // --- WebSocket Authentication ---
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        console.error('WebSocket auth failed: No user logged in.');
+        setError('User not authenticated. Please log in.');
+        setStatus('idle');
+        reject(new Error('User not authenticated'));
+        return;
+      }
+
+      let idToken: string;
+      try {
+        idToken = await user.getIdToken();
+      } catch (tokenError) {
+        console.error('Failed to get Firebase token:', tokenError);
+        setError('Failed to authenticate. Please try again.');
+        setStatus('idle');
+        reject(tokenError);
+        return;
+      }
+      // --- End WebSocket Authentication ---
+
       // Derive WebSocket origin carefully so environments with "/api" suffixes still work.
       const backendOrigin = resolveBackendOrigin();
       const wsProtocol = backendOrigin.startsWith('https') ? 'wss' : backendOrigin.startsWith('http') ? 'ws' : undefined;
       const normalizedOrigin = backendOrigin.replace(/^https?/, wsProtocol || 'ws');
-      const wsUrl = `${normalizedOrigin}/ws/stt/stream`;
-      console.log('Connecting to WebSocket:', wsUrl);
+      const wsUrl = `${normalizedOrigin}/ws/stt/stream?token=${encodeURIComponent(idToken)}`;
+      console.log('Connecting to WebSocket:', wsUrl.replace(/token=[^&]+/, 'token=[REDACTED]'));
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -118,9 +142,19 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
 
       ws.onclose = (event) => {
         console.log('WebSocket connection closed:', event.code, event.reason);
+
+        // Handle authentication failure (custom close code 4001)
+        if (event.code === 4001) {
+          console.error('WebSocket auth rejected:', event.reason);
+          setError('Authentication failed. Please log in again.');
+          setStatus('idle');
+          manualStopRef.current = true; // Prevent auto-transition
+          return;
+        }
+
         // Only auto-transition if this wasn't a manual stop
         if (!manualStopRef.current && status === 'dictating') {
-            setStatus('review'); // Move to review when connection closes during dictation
+          setStatus('review'); // Move to review when connection closes during dictation
         }
         manualStopRef.current = false; // Reset for next session
       };
@@ -133,25 +167,27 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
     setStatus('connecting');
     try {
       await connectWebSocket();
-      await startRecording({ onChunk: (chunk) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-          return;
-        }
+      await startRecording({
+        onChunk: (chunk) => {
+          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            return;
+          }
 
-        chunk.arrayBuffer()
-          .then((buffer) => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              try {
-                wsRef.current.send(buffer);
-              } catch (e) {
-                console.warn('Socket send failed (likely closing):', e);
+          chunk.arrayBuffer()
+            .then((buffer) => {
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  wsRef.current.send(buffer);
+                } catch (e) {
+                  console.warn('Socket send failed (likely closing):', e);
+                }
               }
-            }
-          })
-          .catch((err) => {
-            console.error('Failed to stream audio chunk to STT socket:', err);
-          });
-      }});
+            })
+            .catch((err) => {
+              console.error('Failed to stream audio chunk to STT socket:', err);
+            });
+        }
+      });
     } catch (err) {
       console.error('Failed to start dictation:', err);
       setError('Could not start microphone. Please check permissions.');
@@ -181,7 +217,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
         setTranscript({ final: '', interim: '' });
       }
       setStatus(nextStatus);
-      
+
       // Delay socket closure to allow final audio chunk to flush
       setTimeout(() => {
         closeSocket();
@@ -215,7 +251,7 @@ const useRealtimeStt = (): UseRealtimeSttReturn => {
       console.warn('stopAndPlay called but not in dictating state, current status:', status);
       return '';
     }
-    
+
     // Return the current transcript for immediate playback
     const currentTranscript = `${transcript.final}${transcript.interim}`.trim();
     console.log('stopAndPlay: returning transcript of length', currentTranscript.length);

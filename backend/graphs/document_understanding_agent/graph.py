@@ -21,6 +21,9 @@ from langgraph.graph import StateGraph, END
 # State - use absolute import
 from backend.graphs.document_understanding_agent.state import DocumentUnderstandingState
 
+# Firestore service for fetching user profile
+from backend.services.firestore_service import FirestoreService
+
 # --- Initialize Gemini API ---
 def initialize_gemini_api():
     """Initialize Gemini API with GOOGLE_API_KEY."""
@@ -43,7 +46,8 @@ GEMINI_API_INITIALIZED = initialize_gemini_api()
 # --- Constants ---
 MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-3-flash-preview")
 
-COMPREHENSIVE_LLM_PROMPT = """You are an advanced document analysis assistant. Your task is to analyze the provided document file, which may contain a mix of text, images, tables, and graphs/charts. Your goal is to produce a single, coherent, and detailed textual output that accurately represents the document's content as if you were meticulously reading it aloud for academic study by someone who cannot read the text visually, particularly a student with severe dyslexia. The output must be ready for clear and natural-sounding Text-to-Speech (TTS).
+# --- Prompt for users WITH visual impairment (detailed visual descriptions) ---
+PROMPT_VISUALLY_IMPAIRED = """You are an advanced document analysis assistant. Your task is to analyze the provided document file, which may contain a mix of text, images, tables, and graphs/charts. Your goal is to produce a single, coherent, and detailed textual output that accurately represents the document's content as if you were meticulously reading it aloud for academic study by someone who cannot read the text visually, particularly a student with severe dyslexia. The output must be ready for clear and natural-sounding Text-to-Speech (TTS).
 
 Please perform the following:
 
@@ -65,6 +69,51 @@ Please perform the following:
         * Carefully identify and accurately transcribe any and all visible text within the image itself (e.g., text on signs, labels, clothing, or overlaid on the image).
         * If the context or significance of this embedded text is apparent from the image or its immediate surroundings, briefly state it.
         * Seamlessly integrate this brief description and the full transcription of any embedded text into the overall narrative flow, ensuring it's clearly delineated for the listener.
+
+4.  Tables:
+    * When a table is encountered in the reading flow:
+        * Provide a clear title or a brief summary of the table's main topic or purpose, as stated in or implied by the document.
+        * "Translate the table into words": Do not just list the raw data if a more explanatory approach is possible. Explain the table's structure (e.g., "This table has X columns titled A, B, C, and Y rows."). Then, narrate the key information, data points, or relationships presented in the table in an easy-to-understand, spoken-word format.
+        * Ensure this verbal explanation is well-punctuated for TTS.
+
+5.  Graphs and Charts:
+    * When a graph or chart is encountered in the reading flow:
+        * Identify its type (e.g., bar chart, line graph, pie chart).
+        * Provide a clear title or a brief summary of what the graph represents, as stated in or implied by the document.
+        * "Translate the graph into words": Describe its main features (e.g., what the axes represent, key trends, significant data points, or the main message conveyed by the visual). Explain this information in a narrative form suitable for TTS.
+
+Output Requirements:
+
+* The final output must be a single, continuous block of well-structured text, accurately reflecting the document's content in the specified reading order, and ready for TTS.
+* The language used for descriptions and transitions should be clear and concise.
+* Crucially, all extracted text and any generated descriptions/explanations must be meticulously punctuated (periods, commas, new paragraphs, etc.) to ensure the text can be converted into natural-sounding speech by a TTS engine.
+* Maintain a neutral, objective tone suitable for academic material.
+
+Please analyze the provided document based on these revised instructions, paying close attention to the specified reading order.
+"""
+
+# --- Prompt for users WITHOUT visual impairment (text extraction focus) ---
+PROMPT_STANDARD = """You are an advanced document analysis assistant. Your task is to analyze the provided document file, which may contain a mix of text, images, tables, and graphs/charts. Your goal is to produce a single, coherent, and detailed textual output that accurately represents the document's content as if you were meticulously reading it aloud for academic study. The output must be ready for clear and natural-sounding Text-to-Speech (TTS).
+
+Please perform the following:
+
+1.  Overall Structure and Reading Order:
+    * **CRITICAL INSTRUCTION: Your analysis MUST begin from the absolute top-left of the document. If the very first element encountered at the top-left is an image, you MUST describe and process this image (including any text within it) BEFORE proceeding to any other content.** Then, continue to proceed through the rest of the content following a standard Western reading order: top-to-bottom, then left-to-right.
+    * For documents with multiple columns: You MUST process the content of the leftmost column in its entirety (from top to bottom, including any text, images, tables, etc., that fall within that column's visual boundary) before moving to the next column to its right. Continue this pattern for all columns on the page.
+    * The final output should be a single, continuous narrative that reflects this natural, sequential reading path through the document.
+
+2.  Textual Content:
+    * Extract all textual content verbatim as it appears in the established reading order. Instead of explaining or summarizing paragraphs, your output should be a direct transcription of the text from the document.
+    * Preserve the original wording and sentence structure.
+    * Ensure all extracted text is meticulously punctuated with appropriate commas, periods, capitalization, sentence breaks, and paragraph breaks to allow for clear and natural-sounding TTS rendering.
+    * If there are distinct sections or headings in the document, clearly include them as they appear in the reading flow.
+
+3.  Images:
+    * **STRICT TEXT FOCUS**: You must Strictly transcribe any text found within the image. 
+    * **ENVIRONMENT IGNORED**: Do NOT describe the environment, background, furniture, animals, people, or any visual aesthetics/scenes. Ignore the setting entirely. 
+    * **IMMEDIATE CONTAINER CONTEXT ONLY**: You may ONLY describe the immediate physical container of the text (e.g. "On a wooden sign...", "On a blue banner...", "On a product label..."). Do not describe what is around that container.
+    * **DIAGRAMS**: Only describe the structural content of diagrams if they contain data. 
+    * **DECORATIVE**: Completely ignore decorative images that contain no text or data.
 
 4.  Tables:
     * When a table is encountered in the reading flow:
@@ -121,7 +170,36 @@ def download_gcs_file_to_bytes(gcs_uri: str) -> Optional[bytes]:
         logger.error(f"Error downloading from GCS {gcs_uri}: {e}", exc_info=True)
         return None
 
-# --- Agent Node ---
+# --- Fetch User Profile Node ---
+def fetch_user_profile_node(state: DocumentUnderstandingState) -> DocumentUnderstandingState:
+    """Fetch user profile from Firestore and set visual_impairment flag."""
+    logger.info(f"[{datetime.now(timezone.utc)}] Entering fetch_user_profile_node for doc: {state.get('document_id')}")
+    
+    user_id = state.get('user_id')
+    state['visual_impairment'] = False  # Default to False
+    
+    if not user_id:
+        logger.warning("No user_id provided in state. Defaulting visual_impairment to False.")
+        return state
+    
+    try:
+        firestore_service = FirestoreService()
+        user_profile = firestore_service.get_user(user_id)
+        
+        if user_profile:
+            # Note: visualImpairment is stored at the ROOT level of the user document
+            visual_impairment = user_profile.get('visualImpairment', False)
+            state['visual_impairment'] = bool(visual_impairment)
+            logger.info(f"User {user_id} profile fetched. visualImpairment={state['visual_impairment']}")
+        else:
+            logger.warning(f"User profile not found for user_id: {user_id}. Defaulting visual_impairment to False.")
+    except Exception as e:
+        logger.error(f"Error fetching user profile for {user_id}: {e}. Defaulting visual_impairment to False.", exc_info=True)
+    
+    logger.info(f"[{datetime.now(timezone.utc)}] Exiting fetch_user_profile_node. visual_impairment={state.get('visual_impairment')}")
+    return state
+
+# --- Generate Narrative Node ---
 def generate_tts_narrative_node(state: DocumentUnderstandingState) -> DocumentUnderstandingState:
     logger.info(f"[{datetime.now(timezone.utc)}] Entering generate_tts_narrative_node for doc: {state.get('document_id')}")
     state['error_message'] = None # Clear previous errors
@@ -202,9 +280,17 @@ def generate_tts_narrative_node(state: DocumentUnderstandingState) -> DocumentUn
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
 
+        # Select prompt based on visual_impairment flag
+        if state.get('visual_impairment') is True:
+            selected_prompt = PROMPT_VISUALLY_IMPAIRED
+            logger.info(f"Using PROMPT_VISUALLY_IMPAIRED for user with visual impairment.")
+        else:
+            selected_prompt = PROMPT_STANDARD
+            logger.info(f"Using PROMPT_STANDARD for user without visual impairment.")
+
         logger.info(f"Sending request to Gemini model: {MODEL_NAME} with prompt and document.")
         response = model.generate_content(
-            [COMPREHENSIVE_LLM_PROMPT, file_data],
+            [selected_prompt, file_data],
             generation_config=generation_config,
             safety_settings=safety_settings
         )
@@ -227,12 +313,20 @@ def generate_tts_narrative_node(state: DocumentUnderstandingState) -> DocumentUn
 # --- Graph Definition ---
 def create_document_understanding_graph():
     workflow = StateGraph(DocumentUnderstandingState)
+    
+    # Add nodes
+    workflow.add_node("fetch_profile", fetch_user_profile_node)
     workflow.add_node("generate_narrative", generate_tts_narrative_node)
-    workflow.set_entry_point("generate_narrative")
+    
+    # Set entry point to fetch_profile (new node)
+    workflow.set_entry_point("fetch_profile")
+    
+    # Wire edges: fetch_profile -> generate_narrative -> END
+    workflow.add_edge("fetch_profile", "generate_narrative")
     workflow.add_edge("generate_narrative", END)
     
     agent_executor = workflow.compile()
-    logger.info("Document Understanding Agent graph compiled successfully with new structure.")
+    logger.info("Document Understanding Agent graph compiled successfully with adaptive prompt structure (2 nodes).")
     return agent_executor
 
 agent_executor = create_document_understanding_graph()

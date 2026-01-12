@@ -79,6 +79,13 @@ def sanitize_text_for_tts(text: str) -> str:
         # Normalize all whitespace (multiple spaces to single space)
         clean_paragraph = re.sub(r'\s+', ' ', clean_paragraph)
         
+        # Escape XML/SSML special characters (required for Neural2 voices)
+        clean_paragraph = clean_paragraph.replace('&', '&amp;')  # Must be first
+        clean_paragraph = clean_paragraph.replace('<', '&lt;')
+        clean_paragraph = clean_paragraph.replace('>', '&gt;')
+        clean_paragraph = clean_paragraph.replace('"', '&quot;')
+        clean_paragraph = clean_paragraph.replace("'", '&apos;')
+        
         # Final trim to remove any leading/trailing whitespace
         clean_paragraph = clean_paragraph.strip()
         

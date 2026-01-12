@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
-import { 
+import {
   User,
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -10,8 +10,6 @@ import {
   sendEmailVerification // Import sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
-import { firestore } from '../firebase/config';
 import { apiService } from '../services/api';
 
 // Default user preferences for accessibility
@@ -47,15 +45,26 @@ export interface UserPreferences {
   cloudTtsEnabled: boolean;
   cloudTtsVoice: string;
   ttsDelay?: number; // Delay in milliseconds before TTS is triggered on hover/focus
-  
+
   // Answer Formulation preferences
   answerFormulationAutoPause?: boolean; // Auto-pause dictation when user pauses speaking
   answerFormulationPauseDuration?: number; // Duration in seconds before auto-pause triggers
   answerFormulationSessionsCompleted?: number; // Number of completed sessions
   answerFormulationAutoPauseSuggestionDismissed?: boolean; // Whether user dismissed the auto-pause tip
   answerFormulationOnboardingCompleted?: boolean; // Whether user completed guided practice
-  
+
+
+
+  // Profile Setup Fields (Root level in Firestore, but mapped here for convenience if needed, 
+  // though typically these aren't preferences. We will track completion separately)
+
   getAuthToken?: (forceRefresh?: boolean) => Promise<string>;
+}
+
+// Result of checking if profile is complete
+export interface ProfileStatus {
+  isProfileComplete: boolean;
+  missingFields: string[];
 }
 
 // Define result type for signup
@@ -70,6 +79,7 @@ export interface AuthContextType {
   currentUser: User | null;
   userPreferences: UserPreferences;
   loading: boolean;
+  isProfileComplete: boolean; // New flag
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
@@ -77,6 +87,7 @@ export interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserPreferences: (preferences: Partial<UserPreferences>) => Promise<void>;
+  updateProfileDetails: (details: { dateOfBirth: string; visualImpairment: boolean; schoolContext: string; adaptToAge: boolean }) => Promise<void>; // New method
   getAuthToken: (forceRefresh?: boolean) => Promise<string>;
 }
 
@@ -87,6 +98,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
+  const [isProfileComplete, setIsProfileComplete] = useState<boolean>(true); // Default true to avoid flash, will check on load
   const [loading, setLoading] = useState(true);
 
   // Effect to handle auth state changes & fetch user-specific data
@@ -97,24 +109,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Ensure token is fresh, helps with timing issues on initial load
           await user.getIdToken(true);
 
-          const userDocRef = doc(firestore, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
+          console.log(`[AuthContext:onAuthStateChanged] Fetching user profile for ${user.uid} via API.`);
 
-          if (userDoc.exists()) {
-            console.log(`[AuthContext:onAuthStateChanged] User doc found for ${user.uid}. Loading preferences.`);
-            const userData = userDoc.data();
+          let userData: any = null;
+          try {
+            // apiService.getUserProfile() returns the user data directly (already extracts response.data.data)
+            const profileData = await apiService.getUserProfile();
+            if (profileData && Object.keys(profileData).length > 0) {
+              userData = profileData;
+              console.log('[AuthContext] DEBUG: User Data from API:', JSON.stringify(userData));
+            }
+          } catch (apiError) {
+            console.warn('[AuthContext] API profile fetch failed, using defaults or partial data:', apiError);
+            // If API fails (e.g. 404 if user not init yet, though unlikely with Google Sign In flow changes), 
+            // we will treat as incomplete.
+          }
+
+          if (userData) {
             setUserPreferences(userData.preferences || DEFAULT_USER_PREFERENCES);
-            // Removed direct Firestore write for lastLogin as per backend architecture refactor
+
+            // Check for mandatory profile fields
+            const hasDOB = !!userData.dateOfBirth;
+            const hasSchool = !!userData.schoolContext;
+
+            console.log(`[AuthContext] DEBUG: hasDOB=${hasDOB}, hasSchool=${hasSchool}`);
+
+            const complete = hasDOB && hasSchool;
+            setIsProfileComplete(complete);
+            console.log(`[AuthContext] Profile completion status: ${complete}`);
+
           } else {
-            console.warn(`[AuthContext:onAuthStateChanged] User doc for ${user.uid} not found. Using defaults.`);
-            // We do NOT create the doc here anymore. It should have been created by the backend on signup.
-            // If it's missing, it might be a legacy user or sync issue.
+            console.warn(`[AuthContext:onAuthStateChanged] No user data returned from API. Using defaults.`);
             setUserPreferences(DEFAULT_USER_PREFERENCES);
+            setIsProfileComplete(false);
           }
           setCurrentUser(user);
         } catch (error) {
           console.error('[AuthContext:onAuthStateChanged] Error processing user state:', error);
-          // Fallback: set user but with default prefs if Firestore interaction fails
+          // Fallback
           setCurrentUser(user);
           setUserPreferences(DEFAULT_USER_PREFERENCES);
         } finally {
@@ -124,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // No user / user signed out
         setCurrentUser(null);
         setUserPreferences(DEFAULT_USER_PREFERENCES);
+        setIsProfileComplete(true);
         setLoading(false);
       }
     });
@@ -143,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInCallback = useCallback(async (email: string, password: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    
+
     // Check email verification
     if (!userCredential.user.emailVerified) {
       await firebaseSignOut(auth);
@@ -163,21 +196,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpCallback = useCallback(async (email: string, password: string, displayName: string): Promise<SignUpResult> => {
     try {
       console.log('[AuthContext:signUpCallback] Starting Server-First user creation');
-      
+
       // 1. Create User on Backend (This enforces schema and creates Firestore doc)
-      await apiService.createUser({ 
-        email, 
-        password, 
-        display_name: displayName 
+      await apiService.createUser({
+        email,
+        password,
+        display_name: displayName
       });
       console.log('[AuthContext:signUpCallback] Backend user creation successful');
 
       // 2. Sign In to establish session (required to send verification email)
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // 3. Send Verification Email
       await sendEmailVerification(userCredential.user);
-      
+
       // 4. Sign Out immediately (enforce verification before access)
       await firebaseSignOut(auth);
       console.log('[AuthContext:signUpCallback] Verification email sent, user signed out');
@@ -185,10 +218,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { user: null, partial: false }; // Return null user to indicate "not logged in"
     } catch (error: any) {
       console.error('[AuthContext:signUpCallback] Signup failed:', error);
-      return { 
-        user: null, 
-        partial: false, 
-        error: error.response?.data?.message || error.message || 'Signup failed' 
+      return {
+        user: null,
+        partial: false,
+        error: error.response?.data?.message || error.message || 'Signup failed'
       };
     }
   }, []);
@@ -200,14 +233,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteAccountCallback = useCallback(async () => {
     if (!currentUser) return;
     try {
-        console.log('[AuthContext:deleteAccountCallback] Requesting account deletion via API');
-        await apiService.deleteUser();
-        // Force client-side signout just in case
-        await firebaseSignOut(auth);
-        console.log('[AuthContext:deleteAccountCallback] Account deleted successfully');
+      console.log('[AuthContext:deleteAccountCallback] Requesting account deletion via API');
+      await apiService.deleteUser();
+      // Force client-side signout just in case
+      await firebaseSignOut(auth);
+      console.log('[AuthContext:deleteAccountCallback] Account deleted successfully');
     } catch (error) {
-        console.error('[AuthContext:deleteAccountCallback] Error deleting account:', error);
-        throw error;
+      console.error('[AuthContext:deleteAccountCallback] Error deleting account:', error);
+      throw error;
     }
   }, [currentUser]);
 
@@ -217,7 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext:signInWithGoogleCallback] Attempting Google Sign-In via popup...');
       await signInWithPopup(auth, provider);
       console.log('[AuthContext:signInWithGoogleCallback] Google Sign-In popup initiated successfully.');
-      
+
       // Initialize profile for Google users (prevents "Ghost User" issue)
       try {
         console.log('[AuthContext] Initializing Google user profile...');
@@ -253,17 +286,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newPreferences = { ...userPreferences, ...preferences };
     // Ensure getAuthToken is not part of the preferences sent to API
     const { getAuthToken, ...prefsToStore } = newPreferences;
-    
+
     try {
-        await apiService.updateUserProfile({ preferences: prefsToStore });
-        setUserPreferences(newPreferences); // Update local state
-        console.log('[AuthContext:updateUserPreferencesCallback] User preferences updated via API.');
+      await apiService.updateUserProfile({ preferences: prefsToStore });
+      setUserPreferences(newPreferences); // Update local state
+      console.log('[AuthContext:updateUserPreferencesCallback] User preferences updated via API.');
     } catch (error) {
-        console.error('[AuthContext:updateUserPreferencesCallback] Failed to update preferences:', error);
-        // We might want to throw here so the UI knows it failed
-        throw error; 
+      console.error('[AuthContext:updateUserPreferencesCallback] Failed to update preferences:', error);
+      // We might want to throw here so the UI knows it failed
+      throw error;
     }
   }, [currentUser, userPreferences]);
+
+  const updateProfileDetailsCallback = useCallback(async (details: { dateOfBirth: string; visualImpairment: boolean; schoolContext: string; adaptToAge: boolean }) => {
+    if (!currentUser) throw new Error('No user logged in');
+
+    try {
+      await apiService.updateUserProfile(details);
+      // We assume success means it's done. Update local state immediately.
+      setIsProfileComplete(true);
+      console.log('[AuthContext] Profile details updated. Marked complete.');
+    } catch (error) {
+      console.error('[AuthContext] Failed to update profile details:', error);
+      throw error;
+    }
+  }, [currentUser]);
 
   const enhancedPreferences = useMemo(() => ({
     ...userPreferences,
@@ -274,6 +321,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser,
     userPreferences: enhancedPreferences,
     loading,
+    isProfileComplete,
     signIn: signInCallback,
     signUp: signUpCallback,
     signOut: signOutCallback,
@@ -281,11 +329,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithGoogle: signInWithGoogleCallback,
     resetPassword: resetPasswordCallback,
     updateUserPreferences: updateUserPreferencesCallback,
+    updateProfileDetails: updateProfileDetailsCallback,
     getAuthToken: getAuthTokenCallback,
   }), [
     currentUser,
     enhancedPreferences,
     loading,
+    isProfileComplete,
     signInCallback,
     signUpCallback,
     signOutCallback,
@@ -293,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithGoogleCallback,
     resetPasswordCallback,
     updateUserPreferencesCallback,
+    updateProfileDetailsCallback,
     getAuthTokenCallback
   ]);
 

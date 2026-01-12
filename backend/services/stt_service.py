@@ -55,10 +55,10 @@ class STTService:
             
             # Initialize Speech-to-Text client
             self.client = speech.SpeechClient(credentials=credentials)
-            print("Speech-to-Text client initialized successfully.")
+            logging.info("Speech-to-Text client initialized successfully.")
             
         except Exception as e:
-            print(f"ERROR initializing Speech-to-Text client: {e}")
+            logging.error(f"ERROR initializing Speech-to-Text client: {e}")
             # Don't raise the exception - log it and continue, but service will be unavailable
     
     def _check_client(self) -> bool:
@@ -68,7 +68,7 @@ class STTService:
             bool: True if client is initialized, False otherwise
         """
         if not self.client:
-            print("ERROR: Speech-to-Text client not initialized.")
+            logging.error("Speech-to-Text client not initialized.")
             return False
         return True
     
@@ -85,7 +85,7 @@ class STTService:
         """Transcribe audio provided as bytes using non-streaming recognition"""
         
         if not audio_bytes:
-            print("[STTService] Error: No audio bytes received for transcription.")
+            logging.error("[STTService] No audio bytes received for transcription.")
             if self.logger: self.logger.error("[STTService] No audio bytes received for transcription.")
             return False, {"error": "No audio data provided."}
 
@@ -126,7 +126,7 @@ class STTService:
                     if audio_channel_count is not None:
                         config_args["audio_channel_count"] = audio_channel_count
             else:
-                print("[STTService] Warning: Audio encoding is None. Transcription may fail or be inaccurate.")
+                logging.warning("[STTService] Audio encoding is None. Transcription may fail or be inaccurate.")
                 if self.logger: self.logger.warning("[STTService] Audio encoding is None.")
                 # Potentially set a default like LINEAR16 if appropriate, or raise error
                 # For now, we expect stt_tool to always provide an encoding.
@@ -135,11 +135,11 @@ class STTService:
             config = speech.RecognitionConfig(**config_args)
 
             log_msg_config = f"[STTService] Sending RecognitionConfig: {config}"
-            print(log_msg_config)
+            logging.info(log_msg_config)
             if self.logger: self.logger.info(log_msg_config)
             
             log_msg_bytes = f"[STTService] Audio bytes length: {len(audio_bytes)}"
-            print(log_msg_bytes)
+            logging.info(log_msg_bytes)
             if self.logger: self.logger.info(log_msg_bytes)
 
             # For debugging: Save the audio bytes being sent to the API
@@ -160,11 +160,11 @@ class STTService:
                 with open(debug_audio_filepath, "wb") as f:
                     f.write(audio_bytes)
                 save_log_msg = f"[STTService] Saved audio bytes sent to API for inspection at: {debug_audio_filepath}"
-                print(save_log_msg)
+                logging.info(save_log_msg)
                 if self.logger: self.logger.info(save_log_msg)
             except Exception as e_save:
                 save_err_msg = f"[STTService] Error saving debug audio file: {e_save}"
-                print(save_err_msg)
+                logging.error(save_err_msg)
                 if self.logger: self.logger.error(save_err_msg)
 
 
@@ -175,7 +175,7 @@ class STTService:
             api_call_duration = time.time() - api_call_start_time
             
             duration_log_msg = f"[STTService] STT API call duration: {api_call_duration:.2f}s"
-            print(duration_log_msg)
+            logging.info(duration_log_msg)
             if self.logger: self.logger.info(duration_log_msg)
 
             billed_time_msg = "[STTService] total_billed_time: N/A (field not present or not recognized)"
@@ -195,12 +195,12 @@ class STTService:
                     if billed_time_obj: # if it's truthy, assume non-zero for the check
                          billed_time_value_for_check = -1 # Placeholder for non-zero unknown type
             
-            print(billed_time_msg)
+            logging.info(billed_time_msg)
             if self.logger: self.logger.info(billed_time_msg)
 
             if billed_time_value_for_check is None or billed_time_value_for_check == 0:
                 warn_billed_time_msg = "[STTService] Warning: total_billed_time is zero or not determined as non-zero. Audio might not have been fully processed or recognized as speech."
-                print(warn_billed_time_msg)
+                logging.warning(warn_billed_time_msg)
                 if self.logger: self.logger.warning(warn_billed_time_msg)
 
 
@@ -208,11 +208,11 @@ class STTService:
                 transcript = response.results[0].alternatives[0].transcript
                 confidence = response.results[0].alternatives[0].confidence
                 success_log_msg = f"[STTService] Transcription successful: '{transcript}' (Confidence: {confidence:.4f})"
-                print(success_log_msg)
+                logging.info(success_log_msg)
                 if self.logger: self.logger.info(success_log_msg)
                 transcript_text = transcript
                 if not self.logger: # Ensure logger is available before using
-                    print(f"[STTService] Transcription result: {transcript_text}")
+                    logging.info(f"[STTService] Transcription result: {transcript_text}")
                 else:
                     self.logger.info(f"[STTService] Transcription successful: {transcript_text[:100]}...")
             
@@ -228,7 +228,7 @@ class STTService:
             return True, result_details
         except Exception as e:
             error_msg = f"[STTService] Error during STT API call: {e}"
-            print(error_msg)
+            logging.error(error_msg)
             if self.logger: self.logger.error(error_msg)
             # Log the full exception traceback
             traceback.print_exc()
@@ -264,7 +264,7 @@ class STTService:
         try:
             # Check if file exists
             if not os.path.exists(file_path):
-                print(f"Audio file not found at {file_path}")
+                logging.error(f"Audio file not found at {file_path}")
                 return False, None
             
             # Read the audio file
@@ -282,7 +282,7 @@ class STTService:
             )
             
         except Exception as e:
-            print(f"Error reading audio file: {e}")
+            logging.error(f"Error reading audio file: {e}")
             return False, None
     
     async def transcribe_audio_batch(self, audio_reference: str) -> dict:
@@ -358,7 +358,7 @@ class STTService:
             Iterator of StreamingRecognizeResponse objects or empty iterator on failure
         """
         if not self._check_client():
-            print("Cannot start stream, STT client not initialized.")
+            logging.error("Cannot start stream, STT client not initialized.")
             return iter([])  # Return an empty iterator if client failed
         
         # Configure the streaming request
@@ -369,7 +369,7 @@ class STTService:
         
         try:
             # Start the streaming recognition
-            print("Starting STT streaming request...")
+            logging.info("Starting STT streaming request...")
             responses = self.client.streaming_recognize(
                 config=streaming_config,
                 requests=requests_iterator
@@ -378,7 +378,7 @@ class STTService:
             return responses
             
         except Exception as e:
-            print(f"Error starting STT stream: {e}")
+            logging.error(f"Error starting STT stream: {e}")
             return iter([])  # Return empty iterator on error
     
     def create_streaming_config(
@@ -425,7 +425,7 @@ class STTService:
             return True, streaming_config
             
         except Exception as e:
-            print(f"Error creating streaming config: {e}")
+            logging.error(f"Error creating streaming config: {e}")
             return False, None
     
     def get_supported_languages(self) -> Tuple[bool, Optional[List[Dict[str, str]]]]:
@@ -462,7 +462,7 @@ class STTService:
             return True, supported_languages
             
         except Exception as e:
-            print(f"Error getting supported languages: {e}")
+            logging.error(f"Error getting supported languages: {e}")
             return False, None
 
     def handle_stt_stream(self, ws):

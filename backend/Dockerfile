@@ -86,7 +86,7 @@ EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/health', timeout=5)" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:5000/api/health', timeout=5)" || exit 1
 
 # Run the application with Gunicorn
 # Configuration:
@@ -95,11 +95,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # - 120s timeout for long-running requests (AI operations)
 # - Access logs to stdout for container logging
 CMD ["gunicorn", \
-     "--workers", "4", \
-     "--worker-class", "sync", \
-     "--bind", "0.0.0.0:5000", \
-     "--timeout", "120", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "--log-level", "info", \
-     "backend.app:app"]
+    "--workers", "4", \
+    "--worker-class", "sync", \
+    "--bind", "0.0.0.0:5000", \
+    "--timeout", "120", \
+    "--access-logfile", "-", \
+    "--error-logfile", "-", \
+    "--log-level", "info", \
+    "backend.app:app"]

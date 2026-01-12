@@ -10,7 +10,7 @@ import type {
 
 // Create an axios instance with default config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,7 +19,7 @@ const api = axios.create({
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(async (config) => {
   const currentUser = auth.currentUser; // Get currentUser from the auth instance
-  
+
   if (currentUser) {
     try {
       const token = await currentUser.getIdToken(); // Optionally force refresh: await currentUser.getIdToken(true);
@@ -31,7 +31,7 @@ api.interceptors.request.use(async (config) => {
       // Potentially handle token refresh errors or cases where token is unavailable
     }
   }
-  
+
   return config;
 }, (error) => {
   return Promise.reject(error);
@@ -81,7 +81,7 @@ export const apiService = {
         formData.append('stt_processing_mode', options.sttProcessingMode);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'}/api/v2/agent/chat`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000'}/api/v2/agent/chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`,
@@ -95,7 +95,7 @@ export const apiService = {
       }
 
       const responseData = await response.json();
-      
+
       // For review mode, include the transcript in the response
       if (options.sttProcessingMode === 'review') {
         return {
@@ -104,7 +104,7 @@ export const apiService = {
           processing_mode: 'review',
         };
       }
-      
+
       return responseData;
     } catch (error) {
       console.error('Error uploading audio message:', error);
@@ -134,7 +134,7 @@ export const apiService = {
       thread_id: payload.threadId,
       mode: payload.mode,
     });
-    
+
     // Map the backend response to the expected frontend format
     // The backend returns a comprehensive object. We'll pass it through.
     // The key is to map backend fields to frontend fields if they differ.
@@ -178,7 +178,7 @@ export const apiService = {
       throw error; // Re-throw the error to be caught by the calling hook
     }
   },
-  
+
   // Get document by ID
   async getDocument(documentId: string): Promise<{
     id: string;
@@ -196,7 +196,7 @@ export const apiService = {
     const response = await api.get(`/api/documents/${documentId}?include_content=true`);
     return response.data;
   },
-  
+
   // List documents
   async listDocuments(): Promise<Array<{
     id: string;
@@ -210,10 +210,10 @@ export const apiService = {
     const response = await api.get('/api/documents');
     return response.data.data || [];
   },
-  
+
   // Upload document
   async uploadDocument(
-    file: File, 
+    file: File,
     metadata?: Record<string, any>,
     onUploadProgress?: (progressEvent: AxiosProgressEvent) => void
   ): Promise<{
@@ -230,21 +230,21 @@ export const apiService = {
   }> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     if (metadata) {
       formData.append('metadata', JSON.stringify(metadata));
     }
-    
+
     const response = await api.post('/api/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
       onUploadProgress,
     });
-    
+
     return response.data;
   },
-  
+
   // Delete document
   async deleteDocument(documentId: string): Promise<void> {
     await api.delete(`/api/documents/${documentId}`);
@@ -276,7 +276,7 @@ export const apiService = {
     });
     return response.data;
   },
-  
+
   // Get user profile
   async getUserProfile(): Promise<{
     displayName: string;
@@ -287,11 +287,15 @@ export const apiService = {
     const response = await api.get('/api/users/profile');
     return response.data.data || {};
   },
-  
+
   // Update user profile
   async updateUserProfile(updates: {
     displayName?: string;
     preferences?: Record<string, any>;
+    dateOfBirth?: string;
+    visualImpairment?: boolean;
+    schoolContext?: string;
+    adaptToAge?: boolean;
   }): Promise<void> {
     // Updated to use PUT as standardized in backend
     await api.put('/api/users/profile', updates);
@@ -343,7 +347,7 @@ export const apiService = {
       audio_content_base64: response.data.audio_content_base64 || null,
     };
   },
-  
+
   // Continue quiz
   async continueQuiz(threadId: string, answer: string, documentId?: string): Promise<{
     agent_response: string;
@@ -356,7 +360,7 @@ export const apiService = {
       documentId: documentId, // Changed from document_id
       thread_id: threadId,
     });
-    
+
     // Map the backend response to the expected frontend format
     return {
       agent_response: response.data.response || response.data.agent_response || 'No response from AI',
@@ -367,7 +371,7 @@ export const apiService = {
   },
 
   // Answer Formulation API Methods
-  
+
   /**
    * Refine a spoken transcript into a clear written answer
    */
@@ -377,7 +381,7 @@ export const apiService = {
       question: request.question,
       session_id: request.session_id,
     });
-    
+
     return response.data;
   },
 
@@ -389,7 +393,7 @@ export const apiService = {
       session_id: request.session_id,
       edit_command: request.edit_command,
     });
-    
+
     return response.data;
   },
 

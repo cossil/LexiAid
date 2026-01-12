@@ -19,6 +19,7 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seekToTimeRef = useRef<number | null>(null); // Ref to store pending seek time
   const lastHighlightedTimepointRef = useRef<any | null>(null);
+  const isPlayingRef = useRef<boolean>(false); // Track actual playback state independent of React
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -26,6 +27,7 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
       if (audioRef.current.src) URL.revokeObjectURL(audioRef.current.src);
       audioRef.current = null;
     }
+    isPlayingRef.current = false;
     setStatus('idle');
     setActiveTimepoint(null);
     setWordTimepoints([]);
@@ -123,6 +125,7 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
       };
 
       audio.onended = () => {
+        isPlayingRef.current = false;
         if (audioUrlToRevoke) URL.revokeObjectURL(audioUrlToRevoke);
         stopAudio();
       };
@@ -140,6 +143,7 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
       }
 
       await audio.play();
+      isPlayingRef.current = true;
       setStatus('playing');
 
     } catch (err) {
@@ -150,6 +154,15 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
   }, [documentId, fullText, stopAudio]);
 
   const playAudio = useCallback(async (options?: PlayOptions) => {
+    console.log('[TTS_PLAYER] playAudio called', {
+      hasOptions: !!options,
+      status,
+      isPlayingRef: isPlayingRef.current,
+      hasAudioRef: !!audioRef.current,
+      isPaused: audioRef.current?.paused,
+      currentTime: audioRef.current?.currentTime
+    });
+
     if (options) {
       if (status !== 'idle') {
         stopAudio();
@@ -158,22 +171,26 @@ export const useTTSPlayer = (documentId: string | null, fullText: string = '') =
       return;
     }
 
-    switch (status) {
-      case 'playing':
-        audioRef.current?.pause();
-        setStatus('paused');
-        break;
-      case 'paused':
-        audioRef.current?.play();
-        setStatus('playing');
-        break;
-      case 'loading':
-        stopAudio();
-        break;
-      case 'idle':
-        await startPlayback();
-        break;
+    // CRITICAL: Use isPlayingRef which persists across React re-renders
+    if (isPlayingRef.current && audioRef.current) {
+      console.log('[TTS_PLAYER] Pausing audio (isPlayingRef=true)');
+      audioRef.current.pause();
+      isPlayingRef.current = false;
+      setStatus('paused');
+      return;
     }
+
+    // Check if audio exists and is paused (can resume)
+    if (audioRef.current && audioRef.current.currentTime > 0) {
+      console.log('[TTS_PLAYER] Resuming audio (has currentTime)');
+      await audioRef.current.play();
+      isPlayingRef.current = true;
+      setStatus('playing');
+      return;
+    }
+
+    console.log('[TTS_PLAYER] Starting fresh playback');
+    await startPlayback();
   }, [status, startPlayback, stopAudio]);
 
   const seekAndPlay = useCallback((timeInSeconds: number) => {

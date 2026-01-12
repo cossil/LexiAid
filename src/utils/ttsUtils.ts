@@ -58,11 +58,11 @@ export const synthesizeSpeech = async (
       speaking_rate: options.speaking_rate,
       pitch: options.pitch
     });
-    
-    const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
+
+    const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
     const url = `${apiUrl}/api/tts`;
     console.log('[TTS Utils] API URL:', url);
-    
+
     const response = await axios.post(
       url,
       options,
@@ -103,11 +103,11 @@ export const getAvailableVoices = async (
   apiToken: string
 ): Promise<VoiceInfo[]> => {
   try {
-    const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-    const url = languageCode 
+    const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
+    const url = languageCode
       ? `${apiUrl}/api/tts/voices?language_code=${languageCode}`
       : `${apiUrl}/api/tts/voices`;
-    
+
     const response = await axios.get(
       url,
       {
@@ -141,27 +141,27 @@ export const playAudioFromBase64 = (audioData: string, format = 'mp3'): HTMLAudi
     console.error('[TTS Utils] No audio data received');
     throw new Error('No audio data received');
   }
-  
+
   if (audioData.length < 100) {
     console.error('[TTS Utils] Audio data too short, likely invalid. Length:', audioData.length);
     throw new Error('Audio data too short, likely invalid');
   }
-  
+
   // Basic validation that it's actually base64 data
   if (!/^[A-Za-z0-9+/=]+$/.test(audioData)) {
     console.error('[TTS Utils] Audio data contains invalid base64 characters');
     throw new Error('Invalid base64 audio data format');
   }
-  
+
   console.log('[TTS Utils] Creating audio element with base64 data, length:', audioData.length);
-  
+
   // Create audio element
   const audio = new Audio();
-  
+
   // Add comprehensive event listeners for debugging and playback control
   audio.addEventListener('loadedmetadata', () => {
     console.log('[TTS Utils] Audio metadata loaded, duration:', audio.duration);
-    
+
     // Only start playing after metadata is loaded to ensure proper duration
     if (audio.duration && !isNaN(audio.duration)) {
       audio.play().catch(err => {
@@ -171,24 +171,24 @@ export const playAudioFromBase64 = (audioData: string, format = 'mp3'): HTMLAudi
       console.error('[TTS Utils] Audio has invalid duration after metadata loaded:', audio.duration);
     }
   });
-  
+
   audio.addEventListener('play', () => {
     console.log('[TTS Utils] Audio playback started');
   });
-  
+
   audio.addEventListener('canplaythrough', () => {
     console.log('[TTS Utils] Audio can play through completely, duration:', audio.duration);
   });
-  
+
   audio.addEventListener('error', (e) => {
     console.error('[TTS Utils] Audio element error:', e);
   });
-  
+
   // Set source with explicit MIME type for better browser compatibility
   audio.src = `data:audio/${format};base64,${audioData}`;
-  
+
   // Trigger load to start metadata loading
   audio.load();
-  
+
   return audio;
 };

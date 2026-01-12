@@ -26,7 +26,8 @@ export const auth = getAuth(app);
 export const firestore = getFirestore(
   app,
   // Connect to the named database we created
-  import.meta.env.VITE_FIREBASE_DATABASE_NAME || 'default'
+  // Fallback to the specific dev database id if env var is missing/default, matching backend logic
+  import.meta.env.VITE_FIREBASE_DATABASE_NAME || 'ai-tutor-dev-457802'
 );
 
 export const storage = getStorage(app);

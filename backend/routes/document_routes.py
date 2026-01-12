@@ -16,7 +16,7 @@ import docx # For native Word document support
 # Import services and tools from the application context
 # from ..services import FirestoreService, StorageService # Example structure
 
-from google.cloud import documentai_v1 as documentai
+from backend.decorators.auth import require_auth
 from backend.graphs.document_understanding_agent.graph import DocumentUnderstandingState, run_dua_processing_for_document
 
 # from utilities.benchmark import STime # Assuming STime is for benchmarking
@@ -38,73 +38,21 @@ doc_retrieval_service = None
 
 document_bp = Blueprint('document_bp', __name__, url_prefix='/api/documents')
 
-# Helper function to get user from token (adapted for blueprint context)
-def _get_user_from_token(token_override=None):
-    """Helper function to extract and verify user from JWT token."""
-    token = token_override
-    if not token:
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-        else:
-            return None, ({"error": "Authorization header is missing or Bearer token malformed"}, 401)
-
-    if not token:
-        return None, ({"error": "Token is missing"}, 401)
-
-    auth_service = current_app.config.get('AUTH_SERVICE')
-    if not auth_service:
-        current_app.logger.error("AUTH_SERVICE not configured in Flask app.")
-        return jsonify({"error": "Authentication service not available"}), 500
-
-    try:
-        is_valid, user_info = auth_service.verify_id_token(token)
-        if not is_valid or not user_info:
-            return None, ({"error": "Invalid or expired token"}, 401)
-        
-        return user_info, None
-    except Exception as e:
-        current_app.logger.error(f"Token verification failed: {e}")
-        return None, ({"error": "Token verification failed", "details": str(e)}, 401)
-
-
-def auth_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # _get_user_from_token expects the token itself if passed as token_override
-        # It handles extracting from header if token_override is None.
-        # For a decorator, we explicitly manage token extraction here for clarity.
-        token = None
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-        
-        if not token:
-            return jsonify({"error": "Authorization token is missing or malformed"}), 401
-
-        user_data, error_info = _get_user_from_token(token_override=token)
-
-        if error_info:
-            return jsonify(error_info[0]), error_info[1]
-        
-        g.user_id = user_data.get('uid')
-        # You can also set g.user = user_data if you need the full user object in routes
-        return f(*args, **kwargs)
-    return decorated_function
+# Auth helpers removed in favor of backend.decorators.auth.require_auth
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'docx', 'md'}
-OCR_ELIGIBLE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'tiff'}  # DEPRECATED: OCR no longer supported 
 DUA_ELIGIBLE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'} # Define file types for DUA processing (now includes images) 
 TEXT_ELIGIBLE_EXTENSIONS = {'docx', 'txt', 'md'} # Native text support extensions 
+
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @document_bp.route('/upload', methods=['POST'])
-@auth_required
+@require_auth
 def upload_document():
-    """Upload a new document and trigger DUA, OCR, or Advanced Layout processing."""
+    """Upload a new document and trigger DUA or Native Text processing."""
     current_app.logger.info("\n\n--- UPLOAD_DOCUMENT HIT (DUA INTEGRATED - Single Call) ---")
     user_id = g.user_id
 
@@ -177,7 +125,6 @@ def upload_document():
                 return jsonify({"error": "File uploaded but failed to update document details before processing"}), 500
 
             dua_processed_successfully = False
-            ocr_text_content_produced = False
             text_processed_successfully = False
 
             # --- 4. DUA PROCESSING (Single Call Refactor) ---
@@ -188,6 +135,7 @@ def upload_document():
                 
                 dua_initial_state = {
                     "document_id": document_id,
+                    "user_id": user_id,  # Pass user ID for adaptive prompt selection
                     "input_file_path": gcs_uri, # Use GCS URI for DUA processing
                     "input_file_mimetype": file.mimetype,
                     "original_gcs_uri": gcs_uri # Store for reference if needed
@@ -335,26 +283,7 @@ def upload_document():
                 firestore_service.update_document(document_id, final_fs_update_payload)
 
 
-            # --- 5. OCR PROCESSING (if not DUA processed successfully, and eligible for OCR) ---
-            should_run_ocr = False
-            if file_extension in OCR_ELIGIBLE_EXTENSIONS:
-                if file_extension in DUA_ELIGIBLE_EXTENSIONS: # File was DUA eligible
-                    if not dua_processed_successfully: # DUA was eligible but failed or not run
-                        current_app.logger.info(f"DUA processing was not successful for {document_id}. Considering OCR.")
-                        should_run_ocr = True
-                    else: # DUA was eligible and successful
-                        current_app.logger.info(f"DUA processing was successful for {document_id}. DUA narrative will be used; skipping OCR.")
-                        # The DUA narrative should contain the text.
-                else: # File was not DUA eligible, but is OCR eligible
-                    current_app.logger.info(f"Document {document_id} is not DUA eligible. Proceeding with OCR if applicable.")
-                    should_run_ocr = True
-            
-            if should_run_ocr:
-                current_app.logger.warning(f"OCR functionality has been deprecated. Document {document_id} ({file_extension}) will be marked as 'ocr_unavailable'.")
-                final_fs_update_payload['status'] = 'ocr_unavailable'
-                final_fs_update_payload['processing_error'] = 'OCR processing is no longer supported. Please re-upload as a DUA-eligible format (PDF, PNG, JPG, JPEG) for full processing.'
-                final_fs_update_payload['updated_at'] = datetime.now(timezone.utc).isoformat()
-                firestore_service.update_document(document_id, final_fs_update_payload)
+
 
             # Determine final status based on processing outcomes
             if final_fs_update_payload.get('status') not in ['processed_dua', 'processed_ocr', 'dua_failed', 'ocr_failed', 'ocr_empty_result', 'ocr_skipped_tool_unavailable']:
@@ -375,7 +304,6 @@ def upload_document():
                 "gcs_uri": gcs_uri,
                 "status": final_fs_update_payload.get('status'),
                 "dua_processed": dua_processed_successfully or text_processed_successfully,
-                "ocr_processed": ocr_text_content_produced,
                 "dua_narrative_snippet": (final_fs_update_payload.get('dua_narrative_content')[:200] + '...' if final_fs_update_payload.get('dua_narrative_content') else None),
                 "processing_error": final_fs_update_payload.get('processing_error')
             }
@@ -400,7 +328,7 @@ def upload_document():
 
 
 @document_bp.route('/<string:document_id>', methods=['DELETE'])
-@auth_required
+@require_auth
 def delete_document(document_id):
     """Deletes a document and its associated file from GCS."""
     user_id = g.user_id
@@ -456,10 +384,10 @@ def delete_document(document_id):
 
 
 @document_bp.route('', methods=['GET'])
-@auth_required
+@require_auth
 def get_documents():
     """Fetch a list of documents for the user."""
-    user_id = g.user_id  # Set by @auth_required decorator
+    user_id = g.user_id  # Set by @require_auth decorator
     firestore_service = current_app.config['FIRESTORE_SERVICE']
 
     try:
@@ -480,7 +408,7 @@ def get_documents():
         return jsonify({"error": "Internal server error while fetching documents"}), 500
 
 @document_bp.route('/<string:document_id>', methods=['GET'])
-@auth_required
+@require_auth
 def get_document_details(document_id):
     """Get details for a specific document."""
     user_id = g.user_id
@@ -549,19 +477,15 @@ def get_document_details(document_id):
             response_data['content_error'] = 'Document is still being processed by OCR.'
         else: # For other non-txt, non-OCR'd files (e.g. PDF uploaded before OCR was implemented)
             response_data['content'] = None
-            if doc.get('file_type') in OCR_ELIGIBLE_EXTENSIONS:
-                 response_data['content_error'] = 'OCR processing was not performed or did not yield content for this document.'
 
     return jsonify(response_data), 200
 
 
 @document_bp.route('/<document_id>/download', methods=['GET'])
+@require_auth
 def download_document(document_id):
     """Provide a download link/file for a document."""
-    user_data, error = _get_user_from_token()
-    if error:
-        return jsonify(error[0]), error[1]
-    user_id = user_data.get('uid') # May need user_id for authorization checks within service
+    user_id = g.user_id # Set by @require_auth decorator
 
     try:
         # TODO: 
@@ -589,7 +513,7 @@ def download_document(document_id):
         return jsonify({"error": "Internal server error"}), 500
 
 @document_bp.route('/<string:document_id>/tts-assets', methods=['GET'])
-@auth_required
+@require_auth
 def get_tts_assets(document_id):
     """Provides signed URLs for pre-generated TTS audio and timepoints."""
     user_id = g.user_id

@@ -11,7 +11,7 @@ import uuid
 import logging
 import base64
 
-from backend.routes.document_routes import auth_required
+from backend.decorators.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ answer_formulation_bp = Blueprint('answer_formulation', __name__)
 
 
 @answer_formulation_bp.route('/refine', methods=['POST'])
-@auth_required
+@require_auth
 def refine_answer():
     """
     Refine a spoken transcript into a clear written answer.
@@ -136,7 +136,7 @@ def refine_answer():
 
 
 @answer_formulation_bp.route('/edit', methods=['POST'])
-@auth_required
+@require_auth
 def edit_answer():
     """
     Apply an edit command to a refined answer.

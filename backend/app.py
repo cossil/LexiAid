@@ -63,9 +63,7 @@ import firebase_admin
 # Use absolute imports from backend package
 from backend.services import (AuthService, FirestoreService, StorageService, 
                       DocumentRetrievalService, TTSService, STTService)
-# Note: AiTutorAgent (ReAct-based) was previously imported here but is no longer used by the application.
-# The LangGraph-based Supervisor architecture (supervisor_graph.py) now handles all agent functionality.
-# Kept for reference or potential future use. Can be removed if not needed.
+
 
 from backend.graphs.new_chat_graph import create_new_chat_graph # For general chat functionality
 from backend.graphs.quiz_engine_graph import create_quiz_engine_graph # For Quiz Engine V2
@@ -321,6 +319,39 @@ except Exception as e:
 # --- WebSocket STT Endpoint ---
 @sock.route('/ws/stt/stream')
 def stt_stream(ws):
+    # --- WebSocket Authentication ---
+    token = request.args.get('token')
+    
+    if not token:
+        current_app.logger.warning("WebSocket STT connection rejected: Missing authentication token.")
+        try:
+            ws.close(reason=4001, message='Authentication required: Missing token.')
+        except Exception as e:
+            current_app.logger.error(f"Error closing unauthenticated websocket: {e}")
+        return
+    
+    auth_service = current_app.config.get('AUTH_SERVICE')
+    if not auth_service:
+        current_app.logger.error("Auth service not available for WebSocket authentication.")
+        try:
+            ws.close(reason=1011, message='Authentication service unavailable.')
+        except Exception as e:
+            current_app.logger.error(f"Error closing websocket: {e}")
+        return
+    
+    success, user_data = auth_service.verify_id_token(token)
+    if not success or not user_data:
+        current_app.logger.warning("WebSocket STT connection rejected: Invalid or expired token.")
+        try:
+            ws.close(reason=4001, message='Authentication failed: Invalid or expired token.')
+        except Exception as e:
+            current_app.logger.error(f"Error closing websocket with invalid token: {e}")
+        return
+    
+    user_id = user_data.get('uid')
+    current_app.logger.info(f"WebSocket STT connection authenticated for user: {user_id}")
+    # --- End WebSocket Authentication ---
+    
     current_app.logger.info("WebSocket connection established for STT.")
     stt_service = current_app.config.get('SERVICES', {}).get('STTService')
     
@@ -736,65 +767,6 @@ def get_chat_history_route():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'ok', 'message': 'Backend is healthy'}), 200
-
-
-@app.route('/api/tts/synthesize', methods=['POST'])
-@require_auth
-def tts_synthesize_route():
-    """
-    Synthesizes text to speech using TTSService.
-    Expects a JSON payload with a 'text' field.
-    Returns audio data as MP3.
-    """
-    user_id = g.user_id # Available from @require_auth
-    if not request.is_json:
-        current_app.logger.error(f"TTS Synthesis: Request is not JSON. Content-Type: {request.headers.get('Content-Type')}")
-        return jsonify(error="Request must be JSON"), 400
-
-    data = request.get_json()
-    text_to_synthesize = data.get('text')
-    voice_name = data.get('voice_name') # Optional, from useTTSPlayer
-    speaking_rate = data.get('speaking_rate') # Optional, from useTTSPlayer
-    pitch = data.get('pitch') # Optional, from useTTSPlayer
-
-    if not text_to_synthesize:
-        current_app.logger.error(f"TTS Synthesis: Missing 'text' in JSON payload. Received data: {data}")
-        return jsonify(error="Missing 'text' in JSON payload"), 400
-
-    try:
-        tts_service = TTSService() # Get singleton instance
-        if not tts_service.is_functional():
-             current_app.logger.error(f"User {user_id} attempted to use TTS, but service is not functional.")
-             return jsonify(error="TTS service is not available"), 503
-
-        tts_response = tts_service.synthesize_text(
-            text=text_to_synthesize,
-            voice_name=voice_name, # Pass through if provided
-            speaking_rate=speaking_rate, # Pass through if provided
-            pitch=pitch # Pass through if provided
-        )
-
-        if tts_response and tts_response.get("audio_content"):
-            audio_content = tts_response["audio_content"]
-            timepoints = tts_response.get("timepoints", [])
-
-            # Base64 encode the audio content
-            encoded_audio = base64.b64encode(audio_content).decode('utf-8')
-
-            current_app.logger.info(f"Successfully synthesized audio and timepoints for user {user_id}, text: '{text_to_synthesize[:50]}...'")
-            return jsonify({
-                "audio_content": encoded_audio,
-                "timepoints": timepoints
-            })
-        else:
-            current_app.logger.error(f"TTS synthesis failed for user {user_id}, text: '{text_to_synthesize[:50]}...'")
-            return jsonify(error="Failed to synthesize audio"), 500
-    except TTSServiceError as tse:
-        current_app.logger.error(f"TTSServiceError for user {user_id}: {str(tse)}")
-        return jsonify(error=f"TTS Service error: {str(tse)}"), 503
-    except Exception as e:
-        current_app.logger.error(f"Unexpected error in TTS route for user {user_id}: {str(e)}", exc_info=True)
-        return jsonify(error=f"An unexpected error occurred: {str(e)}"), 500
 
 # Route for Firestore connection diagnostics
 @app.route('/api/diagnostics/firestore')

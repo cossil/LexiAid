@@ -53,14 +53,14 @@ const Dashboard: React.FC = () => {
       try {
         // Get user's Firebase ID token
         const token = await currentUser.getIdToken();
-        
+
         if (!token) {
           throw new Error('Authentication token not available');
         }
 
         // Get the backend API URL from environment variables
-        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-        
+        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
+
         // Fetch documents from the backend API
         const response = await axios.get(`${apiUrl}/api/documents`, {
           headers: {
@@ -72,7 +72,7 @@ const Dashboard: React.FC = () => {
         // Handle both array response and {data: []} response formats
         const responseData = response.data;
         const apiDocuments = Array.isArray(responseData) ? responseData : (responseData?.data || []);
-        
+
         const documents: Document[] = apiDocuments
           .map((doc: any) => ({
             id: doc.id,
@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
           .sort((a: Document, b: Document) => b.lastAccessed.getTime() - a.lastAccessed.getTime())
           // Limit to 4 most recent documents
           .slice(0, 4);
-        
+
         setRecentDocuments(documents);
         console.log('Recent documents loaded:', documents.length);
       } catch (error) {
@@ -95,7 +95,7 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchRecentDocuments();
   }, [currentUser]);
 
@@ -103,18 +103,18 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!currentUser) return;
-      
+
       try {
         // Get user's Firebase ID token
         const token = await currentUser.getIdToken();
-        
+
         if (!token) {
           throw new Error('Authentication token not available');
         }
 
         // Get the backend API URL from environment variables
-        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000';
-        
+        const apiUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
+
         // Fetch user profile from the backend API
         console.log('[Dashboard] Fetching user profile data from backend');
         const response = await axios.get(`${apiUrl}/api/users/profile`, {
@@ -126,7 +126,7 @@ const Dashboard: React.FC = () => {
           // If the backend API fails, we'll use the Firebase Auth user data
           return { data: null };
         });
-        
+
         if (response.data?.data) {
           // Backend API returned user profile
           const profileData = response.data.data;
@@ -155,7 +155,7 @@ const Dashboard: React.FC = () => {
         });
       }
     };
-    
+
     fetchUserProfile();
   }, [currentUser]);
 
@@ -185,11 +185,11 @@ const Dashboard: React.FC = () => {
           Continue your learning journey with LexiAid
         </p>
       </div>
-      
+
       {/* Quick Actions */}
       <section className="mb-10" aria-labelledby="quick-actions-heading">
-        <h2 
-          id="quick-actions-heading" 
+        <h2
+          id="quick-actions-heading"
           className={`text-xl font-semibold mb-4 ${highContrast ? 'text-white' : 'text-white'}`}
           onMouseEnter={() => handleHover('Quick Actions')}
           onClick={() => handleHover('Quick Actions')}
@@ -198,13 +198,12 @@ const Dashboard: React.FC = () => {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Upload Document */}
-          <Link 
-            to="/dashboard/upload" 
-            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
-              highContrast 
-                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+          <Link
+            to="/dashboard/upload"
+            className={`flex flex-col items-center justify-center p-6 rounded-lg ${highContrast
+                ? 'bg-gray-900 border border-white hover:bg-gray-800'
                 : 'bg-gray-800/50 hover:bg-gray-700/50'
-            } transition-colors duration-200`}
+              } transition-colors duration-200`}
             onMouseEnter={() => handleHover('Upload Document')}
           >
             <Upload className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-blue-400'}`} aria-hidden="true" />
@@ -214,14 +213,13 @@ const Dashboard: React.FC = () => {
           </Link>
 
           {/* Paste Text */}
-          <Link 
-            to="/dashboard/upload" 
+          <Link
+            to="/dashboard/upload"
             state={{ initialTab: 'text' }}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
-              highContrast 
-                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+            className={`flex flex-col items-center justify-center p-6 rounded-lg ${highContrast
+                ? 'bg-gray-900 border border-white hover:bg-gray-800'
                 : 'bg-gray-800/50 hover:bg-gray-700/50'
-            } transition-colors duration-200`}
+              } transition-colors duration-200`}
             onMouseEnter={() => handleHover('Paste Text')}
           >
             <FileText className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-green-400'}`} aria-hidden="true" />
@@ -229,15 +227,14 @@ const Dashboard: React.FC = () => {
               Paste Text
             </span>
           </Link>
-          
+
           {/* Chat with LexiAid */}
-          <Link 
-            to="/dashboard/chat" 
-            className={`flex flex-col items-center justify-center p-6 rounded-lg ${
-              highContrast 
-                ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+          <Link
+            to="/dashboard/chat"
+            className={`flex flex-col items-center justify-center p-6 rounded-lg ${highContrast
+                ? 'bg-gray-900 border border-white hover:bg-gray-800'
                 : 'bg-gray-800/50 hover:bg-gray-700/50'
-            } transition-colors duration-200`}
+              } transition-colors duration-200`}
             onMouseEnter={() => handleHover('Chat with LexiAid')}
           >
             <MessageSquare className={`h-10 w-10 mb-3 ${highContrast ? 'text-white' : 'text-purple-400'}`} aria-hidden="true" />
@@ -245,34 +242,33 @@ const Dashboard: React.FC = () => {
               Chat with LexiAid
             </span>
           </Link>
-          
+
         </div>
       </section>
-      
+
       {/* Recent Documents */}
       <section className="mb-10" aria-labelledby="recent-documents-heading">
         <div className="flex justify-between items-center mb-4">
-          <h2 
-            id="recent-documents-heading" 
+          <h2
+            id="recent-documents-heading"
             className={`text-xl font-semibold ${highContrast ? 'text-white' : 'text-white'}`}
             onMouseEnter={() => handleHover('Recent Documents')}
             onClick={() => handleHover('Recent Documents')}
           >
             Recent Documents
           </h2>
-          
-          <Link 
-            to="/dashboard/documents" 
-            className={`flex items-center text-sm font-medium ${
-              highContrast ? 'text-white hover:underline' : 'text-blue-400 hover:text-blue-300'
-            }`}
+
+          <Link
+            to="/dashboard/documents"
+            className={`flex items-center text-sm font-medium ${highContrast ? 'text-white hover:underline' : 'text-blue-400 hover:text-blue-300'
+              }`}
             onMouseEnter={() => handleHover('View all documents')}
           >
             View all
             <ChevronRight className="h-4 w-4 ml-1" aria-hidden="true" />
           </Link>
         </div>
-        
+
         {loading ? (
           <div className={`rounded-lg ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} p-6 flex justify-center`}>
             <div className="animate-spin h-8 w-8 border-2 border-t-transparent rounded-full border-white"></div>
@@ -280,14 +276,13 @@ const Dashboard: React.FC = () => {
         ) : recentDocuments.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {recentDocuments.map((doc) => (
-              <Link 
-                key={doc.id} 
+              <Link
+                key={doc.id}
                 to={`/dashboard/documents/${doc.id}`}
-                className={`block rounded-lg p-5 ${
-                  highContrast 
-                    ? 'bg-gray-900 border border-white hover:bg-gray-800' 
+                className={`block rounded-lg p-5 ${highContrast
+                    ? 'bg-gray-900 border border-white hover:bg-gray-800'
                     : 'bg-gray-800/50 hover:bg-gray-700/50'
-                } transition-colors duration-200`}
+                  } transition-colors duration-200`}
                 onMouseEnter={() => handleHover(doc.title)}
               >
                 <div className="flex items-start mb-3">
@@ -296,8 +291,8 @@ const Dashboard: React.FC = () => {
                     {doc.title}
                   </h3>
                 </div>
-                
-                <div 
+
+                <div
                   className={`flex items-center text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}
                   onMouseEnter={(e) => {
                     e.stopPropagation();
@@ -307,9 +302,9 @@ const Dashboard: React.FC = () => {
                   <Calendar className="h-3 w-3 mr-1" aria-hidden="true" />
                   <span>Last accessed: {formatDate(doc.lastAccessed)}</span>
                 </div>
-                
+
                 <div className="mt-2 flex items-center justify-between">
-                  <span 
+                  <span
                     className={`text-xs ${highContrast ? 'text-gray-200' : 'text-gray-400'}`}
                     onMouseEnter={(e) => {
                       e.stopPropagation();
@@ -318,9 +313,9 @@ const Dashboard: React.FC = () => {
                   >
                     {doc.pageCount} {doc.pageCount === 1 ? 'page' : 'pages'}
                   </span>
-                  
+
                   {doc.processingStatus === 'pending' && (
-                    <span 
+                    <span
                       className="text-xs bg-yellow-700/30 text-yellow-300 px-2 py-1 rounded"
                       onMouseEnter={(e) => {
                         e.stopPropagation();
@@ -330,9 +325,9 @@ const Dashboard: React.FC = () => {
                       Processing
                     </span>
                   )}
-                  
+
                   {doc.processingStatus === 'completed' && (
-                    <span 
+                    <span
                       className="text-xs bg-green-700/30 text-green-300 px-2 py-1 rounded"
                       onMouseEnter={(e) => {
                         e.stopPropagation();
@@ -342,9 +337,9 @@ const Dashboard: React.FC = () => {
                       Ready
                     </span>
                   )}
-                  
+
                   {doc.processingStatus === 'error' && (
-                    <span 
+                    <span
                       className="text-xs bg-red-700/30 text-red-300 px-2 py-1 rounded"
                       onMouseEnter={(e) => {
                         e.stopPropagation();
@@ -360,18 +355,17 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className={`rounded-lg ${highContrast ? 'bg-gray-900 border border-white' : 'bg-gray-800/50'} p-8 text-center`}>
-            <p 
+            <p
               className={`mb-4 ${highContrast ? 'text-white' : 'text-gray-300'}`}
               onMouseEnter={() => handleHover('You haven\'t uploaded any documents yet.')}
               onClick={() => handleHover('You haven\'t uploaded any documents yet.')}
             >
               You haven't uploaded any documents yet.
             </p>
-            <Link 
-              to="/dashboard/upload" 
-              className={`inline-flex items-center px-4 py-2 rounded-md ${
-                highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
-              } font-medium transition-colors duration-200`}
+            <Link
+              to="/dashboard/upload"
+              className={`inline-flex items-center px-4 py-2 rounded-md ${highContrast ? 'bg-white text-black hover:bg-gray-200' : 'bg-blue-600 text-white hover:bg-blue-700'
+                } font-medium transition-colors duration-200`}
               onMouseEnter={() => handleHover('Upload your first document')}
             >
               <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -380,7 +374,7 @@ const Dashboard: React.FC = () => {
           </div>
         )}
       </section>
-      
+
       {/* No additional sections beyond recent documents to keep layout clean */}
     </div>
   );

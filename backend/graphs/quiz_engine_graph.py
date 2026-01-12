@@ -1,4 +1,5 @@
 from typing import List, Dict, Optional, Literal, TypedDict, Any, NotRequired
+import os
 import copy
 import json
 import logging
@@ -10,7 +11,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 # --- Configuration ---
-LLM_MODEL_NAME = "gemini-2.5-flash"
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-3-flash-preview")
 TEMPERATURE_QUESTION_GENERATION = 0.7
 TEMPERATURE_EVALUATION = 0.3
 

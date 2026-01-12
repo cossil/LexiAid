@@ -13,10 +13,12 @@ services:
       - hankellnet
     env_file:
       - ./backend/.env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/lexiaid-backend-prod-v2.json
     volumes:
       - lexiaid-backend-data:/app/data
       - lexiaid-backend-logs:/app/logs
-      - ./backend/credentials:/app/credentials:ro
+      - ./secrets:/app/secrets:ro
     deploy:
       mode: replicated
       replicas: 1
@@ -49,11 +51,12 @@ services:
         - "traefik.http.services.lexiaid_backend.loadbalancer.passHostHeader=true"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/api/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
   ## --------------------------- FRONTEND --------------------------- ##
   frontend:
     image: cossil/lexiaid-frontend:latest
